@@ -69,7 +69,7 @@ const injectToken = (instance: AxiosInstance) => {
 const handleAuthError = () => {
   setLocalStorageData('userData', null);
   setLocalStorageData('token', null);
-  window.location.replace('/login');
+  // window.location.replace('/login');
 };
 
 const handleServerError = (apiResponse: APIResponse, error: any) => {

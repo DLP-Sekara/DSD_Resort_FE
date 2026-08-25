@@ -36,3 +36,20 @@ export interface ResetPasswordTypes {
   reference_code?: string;
   otp?: number;
 }
+
+export interface SendOtpTypes {
+  email: string;
+}
+
+export interface VerifyOtpTypes {
+  email: string;
+  otp: string;
+}
+
+export interface ResetPasswordPayloadTypes {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+

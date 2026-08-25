@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { Form, Input } from 'antd';
 import AdminOnBoardingLayout from '../../layout/AdminOnBoardingLayout';
 import type { LoginTypes } from '../../types/onBoarding.interfaces';
 import { useNavigate } from 'react-router-dom';
 import CustomButton from '../../components/common/CustomButton';
 import authMutation from '../../mutations/auth.mutation';
+import ForgotPasswordModal from '../../components/auth/ForgotPasswordModal';
 
 const Login = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState<boolean>(false);
   const { signInMutation } = authMutation();
 
   const { mutateAsync: login, isPending: loading } = signInMutation();
@@ -17,8 +20,12 @@ const Login = () => {
       email: value.email,
       password: value.password,
     };
+
+    // Execute login mutation
     const response = await login(data);
-    console.log(response);
+
+
+    // Redirect to dashboard on successful login
     if (response.success) {
       navigate('/dashboard', { replace: true });
     }
@@ -26,97 +33,107 @@ const Login = () => {
 
   return (
     <AdminOnBoardingLayout>
-      <div className="shadow-lg px-6 rounded-xl">
-        <h2 className="font-spaceGrotesk text-center text-[20px] font-bold text-black md:text-[40px]">
-          Ocean View Resort <br />
-          Admin Portal
-        </h2>
-        <p className="font-regular py-5 text-center text-[16px] text-[#2F2F2F] md:text-[20px]">
-          Welcome back. Please sign in to manage bookings, <br />
-          rooms, and guest services efficiently.
-        </p>
-        <div className="flex h-full flex-col border-t pt-5">
+      <div className="mx-auto w-full max-w-md rounded-2xl border border-gray-100 bg-white px-8 py-10 shadow-xl">
+        <div className="mb-8 text-center">
+          <h2 className="font-spaceGrotesk text-[24px] font-extrabold leading-tight !text-[#092968] md:text-[36px]">
+            DSD Resort <br />
+            <span className="text-[#F26E22]">Admin Portal</span>
+          </h2>
+          <p className="font-regular mt-3 text-[15px] text-gray-500 md:text-[16px]">
+            Welcome back. Please sign in to manage bookings, rooms, and guest services
+            efficiently.
+          </p>
+        </div>
+
+        {/* Form Section */}
+        <div className="flex h-full flex-col pt-2">
           <Form
             form={form}
-            className="flex h-full flex-col justify-between md:gap-0"
+            className="flex flex-col gap-2"
             name="signin"
             layout="vertical"
             onFinish={onFinish}
             requiredMark={false}
           >
-            <div className="flex flex-col">
-              <Form.Item
-                label={
-                  <span className="text-[16px] font-medium text-[#3A3834]">
-                    Enter your Email
-                  </span>
-                }
-                name="email"
-                rules={[
-                  { required: true, message: 'Please input your email!' },
-                  { type: 'email', message: 'Enter a valid email!' },
-                ]}
-              >
-                <Input
-                  placeholder="Enter your Email"
-                  size="large"
-                  maxLength={100}
-                  className="!rounded-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === ' ') {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-              </Form.Item>
-
-              <Form.Item
-                label={
-                  <span className="text-[16px] font-medium text-[#3A3834]">
-                    Enter Password
-                  </span>
-                }
-                name="password"
-                rules={[
-                  {
-                    required: true,
-                    message: 'Please input your Password!',
-                  },
-                ]}
-              >
-                <Input.Password
-                  className="!rounded-sm"
-                  placeholder="Enter your Password"
-                  size="large"
-                  onKeyDown={(e) => {
-                    if (e.key === ' ') {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-              </Form.Item>
-              
-              <div className="flex flex-row justify-end">
-                <span
-                  className="hover:text-primary -mt-4 flex w-fit cursor-pointer justify-end text-[12px] font-medium text-[#0168FF] underline lg:text-[14px]"
-                  onClick={() => navigate('/reset-password')}
-                >
-                  Forgot/Change PIN ?
+            {/* Email Input */}
+            <Form.Item
+              label={
+                <span className="text-[15px] font-semibold text-[#0B1B3D]">
+                  Email Address
                 </span>
-              </div>
-
-              <CustomButton
-                type="primary"
-                htmlType="submit"
+              }
+              name="email"
+              rules={[
+                { required: true, message: 'Please input your email!' },
+                { type: 'email', message: 'Enter a valid email!' },
+              ]}
+            >
+              <Input
+                placeholder="admin@dsdresort.com"
                 size="large"
-                className="my-6 w-full !rounded-full !bg-[#3A3834] font-semibold"
-                buttonName="Login"
-                loading={loading}
+                maxLength={100}
+                className="!rounded-lg py-2 hover:border-[#F26E22] focus:border-[#F26E22]"
+                onKeyDown={(e) => {
+                  if (e.key === ' ') {
+                    e.preventDefault();
+                  }
+                }}
               />
+            </Form.Item>
+
+            {/* Password Input */}
+            <Form.Item
+              label={
+                <span className="text-[15px] font-semibold text-[#0B1B3D]">Password</span>
+              }
+              name="password"
+              rules={[
+                {
+                  required: true,
+                  message: 'Please input your Password!',
+                },
+              ]}
+            >
+              <Input.Password
+                className="!rounded-lg py-2 hover:border-[#F26E22] focus:border-[#F26E22]"
+                placeholder="Enter your password"
+                size="large"
+                onKeyDown={(e) => {
+                  if (e.key === ' ') {
+                    e.preventDefault();
+                  }
+                }}
+              />
+            </Form.Item>
+
+            {/* Forgot Password Link */}
+            <div className="mb-4 flex flex-row justify-end">
+              <span
+                className="flex w-fit cursor-pointer justify-end text-[13px] font-semibold text-[#0B1B3D] underline transition-colors duration-200 hover:text-[#F26E22]"
+                onClick={() => setIsForgotPasswordOpen(true)}
+              >
+                Forgot Password?
+              </span>
             </div>
+
+            {/* Submit Button */}
+            <CustomButton
+              type="primary"
+              htmlType="submit"
+              size="large"
+              className="h-12 w-full !rounded-xl !border-none !bg-[#F26E22] text-[16px] font-bold text-white shadow-md transition-all hover:!bg-[#D95C1A]"
+              buttonName="Sign In"
+              loading={loading}
+            />
           </Form>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+      />
     </AdminOnBoardingLayout>
   );
 };

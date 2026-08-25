@@ -2,6 +2,9 @@ import type {
   APIResponse,
   LoginTypes,
   ResetPasswordTypes,
+  SendOtpTypes,
+  VerifyOtpTypes,
+  ResetPasswordPayloadTypes,
 } from '../types/onBoarding.interfaces';
 import { axiosInstance } from '../config/axiosService';
 
@@ -36,6 +39,15 @@ const authService = () => {
 
     forgotPasswordService: (data: ResetPasswordTypes) =>
       handleRequest({ url: 'api/v1/admin/forgot-password', data }),
+
+    sendForgotPasswordOtpService: (data: SendOtpTypes) =>
+      handleRequest({ url: 'api/v1/auth/forgot-password/send-otp', data }),
+
+    verifyForgotPasswordOtpService: (data: VerifyOtpTypes) =>
+      handleRequest({ url: 'api/v1/auth/forgot-password/verify-otp', data }),
+
+    resetPasswordService: (data: ResetPasswordPayloadTypes) =>
+      handleRequest({ url: 'api/v1/auth/forgot-password/reset-password', data }),
 
     signOutService: () => handleRequest({ url: 'api/v1/auth/logout' }),
 
