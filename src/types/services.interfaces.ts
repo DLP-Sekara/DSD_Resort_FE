@@ -73,6 +73,7 @@ export interface FoodItem {
   name: string;
   unitPrice: number;
   quantityOnHand: number;
+  isKitchenPrepared?: boolean;
 }
 
 // 5. Payment & Billing Interfaces

@@ -5,6 +5,7 @@ import {
   Bed,
   Utensils,
   UtensilsCrossed,
+  ChefHat,
   Receipt,
   Users,
   Settings,
@@ -38,6 +39,11 @@ const MainSidebar = ({
       name: 'Meal Management',
       icon: <Utensils size={20} />,
       path: '/dashboard/meal-management',
+    },
+    {
+      name: 'Kitchen Management',
+      icon: <ChefHat size={20} />,
+      path: '/dashboard/kitchen-management',
     },
     {
       name: 'Billing & Reports',

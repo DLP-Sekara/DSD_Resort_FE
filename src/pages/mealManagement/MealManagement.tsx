@@ -10,6 +10,7 @@ import {
   Popconfirm,
   Select,
   InputNumber,
+  Switch,
 } from 'antd';
 import { Plus, Edit, Trash2, Utensils, Info, Coffee } from 'lucide-react';
 import ActionDialog from '../../components/common/ActionDialog';
@@ -77,9 +78,16 @@ const MealManagement = () => {
         name: selectedFoodItem.name,
         price: selectedFoodItem.unitPrice,
         quantity: selectedFoodItem.quantityOnHand,
+        isKitchenPrepared:
+          selectedFoodItem.isKitchenPrepared ??
+          (selectedFoodItem as any).is_kitchen_prepared ??
+          false,
       });
     } else {
       foodForm.resetFields();
+      foodForm.setFieldsValue({
+        isKitchenPrepared: false,
+      });
     }
   }, [selectedFoodItem, foodItemDrawerType, foodForm, foodItemModalOpen]);
 
@@ -106,6 +114,7 @@ const MealManagement = () => {
       name: values.name,
       unitPrice: values.price,
       quantityOnHand: values.quantity,
+      isKitchenPrepared: Boolean(values.isKitchenPrepared),
     };
 
     if (foodItemDrawerType === 'add') {
@@ -345,6 +354,15 @@ const MealManagement = () => {
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <span className="h-1 w-1 rounded-full bg-gray-300" />
                     <span>LKR {item?.unitPrice?.toLocaleString()}</span>
+                    {item.isKitchenPrepared ? (
+                      <Tag color="orange" className="ml-1 rounded-md text-[10px] font-bold">
+                        Kitchen Prepared
+                      </Tag>
+                    ) : (
+                      <Tag color="default" className="ml-1 rounded-md text-[10px] font-semibold text-gray-500">
+                        Direct / Ready
+                      </Tag>
+                    )}
                   </div>
                 </div>
 
@@ -427,7 +445,30 @@ const MealManagement = () => {
               />
             </Form.Item>
 
-            <Form.Item className="pt-4">
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/70 p-3.5">
+              <div>
+                <p className="text-xs font-bold text-[#092968]">
+                  Prepared in Kitchen?
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  Enable if this item is cooked or prepared in the kitchen
+                </p>
+              </div>
+              <Form.Item
+                name="isKitchenPrepared"
+                valuePropName="checked"
+                noStyle
+                initialValue={false}
+              >
+                <Switch
+                  checkedChildren="Yes"
+                  unCheckedChildren="No"
+                  className="bg-gray-300"
+                />
+              </Form.Item>
+            </div>
+
+            <Form.Item className="pt-2">
               <CustomButton
                 type="primary"
                 className="w-full bg-orange-500"
