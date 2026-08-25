@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Bed,
   Utensils,
+  UtensilsCrossed,
   Receipt,
   Users,
   Settings,
@@ -26,6 +27,11 @@ const MainSidebar = ({
       name: 'Reservations',
       icon: <ClipboardList size={20} />,
       path: '/dashboard/reservations',
+    },
+    {
+      name: 'Restaurant Orders',
+      icon: <UtensilsCrossed size={20} />,
+      path: '/dashboard/restaurant-orders',
     },
     { name: 'Rooms', icon: <Bed size={20} />, path: '/dashboard/rooms' },
     {

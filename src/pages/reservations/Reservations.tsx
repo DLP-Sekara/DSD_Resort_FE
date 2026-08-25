@@ -22,6 +22,7 @@ import {
   Popconfirm,
   Modal,
   Avatar,
+  Spin,
 } from 'antd';
 import {
   Plus,
@@ -79,6 +80,8 @@ const Reservations = () => {
   // Booking Drawer State
   const [drawerAvailableRooms, setDrawerAvailableRooms] = useState<Room[]>([]);
   const [isAvailabilityChecked, setIsAvailabilityChecked] = useState(false);
+  const [hasSearchedRooms, setHasSearchedRooms] = useState(false);
+  const [isExistingGuest, setIsExistingGuest] = useState<boolean | null>(null);
 
   const [current, setCurrent] = useState(0); // Stepper index
   const [stepDetails, setStepDetails] = useState<any>({});
@@ -211,37 +214,66 @@ const Reservations = () => {
     });
   };
 
-  const checkAvailability = async () => {
-    const values = stepOneForm.getFieldsValue();
-    if (!values.dates || !values.roomType) {
-      errorToast('Please select dates and room type');
-      return;
-    }
+  // Automatic Room Availability Fetching when dates and room type are selected
+  useEffect(() => {
+    if (
+      watchedDates &&
+      watchedDates[0] &&
+      watchedDates[1] &&
+      watchedRoomType
+    ) {
+      if (watchedDates[1].isAfter(watchedDates[0], 'day')) {
+        const data = {
+          typeId: watchedRoomType,
+          checkIn: watchedDates[0].format('YYYY-MM-DD'),
+          checkOut: watchedDates[1].format('YYYY-MM-DD'),
+        };
 
-    const data = {
-      typeId: values.roomType,
-      checkIn: values.dates?.[0]?.format('YYYY-MM-DD'),
-      checkOut: values.dates?.[1]?.format('YYYY-MM-DD'),
-    };
-
-    getAvailableRooms(data, {
-      onSuccess: (res) => {
-        if (res.success) {
-          if (res.data?.length > 0) {
-            setDrawerAvailableRooms(res.data);
-            setIsAvailabilityChecked(true);
-            successToast('Rooms are available! Please select a room to continue.');
-          } else {
-            errorToast('No Available Rooms');
+        setHasSearchedRooms(true);
+        getAvailableRooms(data, {
+          onSuccess: (res) => {
+            if (res.success && res.data?.length > 0) {
+              setDrawerAvailableRooms(res.data);
+              setIsAvailabilityChecked(true);
+            } else {
+              setDrawerAvailableRooms([]);
+              setIsAvailabilityChecked(false);
+              stepOneForm.setFieldValue('roomId', undefined);
+            }
+          },
+          onError: () => {
+            setDrawerAvailableRooms([]);
             setIsAvailabilityChecked(false);
-          }
-        } else {
-          errorToast(res.message || 'No rooms found for selected criteria');
-          setIsAvailabilityChecked(false);
-        }
-      },
-    });
-  };
+            stepOneForm.setFieldValue('roomId', undefined);
+          },
+        });
+      } else {
+        setHasSearchedRooms(false);
+        setDrawerAvailableRooms([]);
+        setIsAvailabilityChecked(false);
+        stepOneForm.setFieldValue('roomId', undefined);
+      }
+    } else {
+      setHasSearchedRooms(false);
+      setDrawerAvailableRooms([]);
+      setIsAvailabilityChecked(false);
+      stepOneForm.setFieldValue('roomId', undefined);
+    }
+  }, [watchedDates, watchedRoomType]);
+
+  // Auto-fill guestCount according to selected roomType maxOccupancy
+  useEffect(() => {
+    if (watchedRoomType && roomTypes?.data) {
+      const selectedType = roomTypes.data.find(
+        (item: RoomType) => item.typeId === watchedRoomType || item.id === watchedRoomType,
+      );
+      if (selectedType && selectedType.maxOccupancy !== undefined) {
+        stepOneForm.setFieldValue('guestCount', selectedType.maxOccupancy);
+      }
+    } else if (!watchedRoomType) {
+      stepOneForm.setFieldValue('guestCount', undefined);
+    }
+  }, [watchedRoomType, roomTypes]);
 
   const handleStepOne = async () => {
     const values = stepOneForm.getFieldsValue();
@@ -249,20 +281,51 @@ const Reservations = () => {
     setCurrent(current + 1);
   };
 
+  const handleNicBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const nicValue = e.target.value?.trim();
+    if (!nicValue) {
+      setIsExistingGuest(null);
+      return;
+    }
+
+    const res = await refetchGuest(nicValue);
+    if (res?.success && res?.data) {
+      stepOneForm.setFieldsValue({
+        guestName: res.data.name,
+        phone: res.data.phone,
+        guestId: res.data.guestId,
+      });
+      setIsExistingGuest(true);
+      successToast('Existing guest found! Details auto-filled.');
+    } else {
+      setIsExistingGuest(false);
+      stepOneForm.setFieldValue('guestId', undefined);
+    }
+  };
+
   const handleStepTwo = async () => {
+    try {
+      await stepOneForm.validateFields(['nic', 'guestName', 'phone']);
+    } catch {
+      return;
+    }
+
     const formData = stepOneForm.getFieldsValue();
     const res = await refetchGuest(formData.nic);
-    if (res.success) {
+    if (res?.success && res?.data?.guestId) {
       setStepDetails({ ...stepDetails, ...formData, guestId: res.data.guestId });
       setCurrent(current + 1);
     } else {
-      const res = await createUser({
+      const createRes = await createUser({
         name: formData.guestName,
         phone: formData.phone,
         nic: formData.nic,
       });
-      if (res.success) {
-        setStepDetails({ ...stepDetails, ...formData, guestId: res.data.guestId });
+      if (createRes?.success && createRes?.data?.guestId) {
+        setStepDetails({ ...stepDetails, ...formData, guestId: createRes.data.guestId });
+        setCurrent(current + 1);
+      } else if (createRes?.success) {
+        setStepDetails({ ...stepDetails, ...formData });
         setCurrent(current + 1);
       }
     }
@@ -292,25 +355,6 @@ const Reservations = () => {
         }
       },
     });
-  };
-
-  const handleGuestSearch = async (nic: string) => {
-    if (!nic) {
-      errorToast('Please enter NIC to search');
-      return;
-    }
-    const res = await refetchGuest(nic);
-    if (res.success) {
-      stepOneForm.setFieldsValue({
-        guestId: res.data.guestId,
-        guestName: res.data.name,
-        nic: res.data.nic,
-        phone: res.data.phone,
-      });
-      successToast('Guest found and details populated!');
-    } else {
-      errorToast('Guest not found');
-    }
   };
 
   // --- Stepper UI Components ---
@@ -599,6 +643,7 @@ const Reservations = () => {
         onClose={() => {
           setIsDrawerOpen(false);
           setSelectedResId(null);
+          setIsExistingGuest(null);
         }}
         open={isDrawerOpen}
         className="custom-scrollbar rounded-l-[2.5rem]"
@@ -640,14 +685,15 @@ const Reservations = () => {
                 {current === 0 ? (
                   <Button
                     type="primary"
+                    disabled={!isAvailabilityChecked || isSearching}
                     onClick={() => {
                       if (!isAvailabilityChecked) {
-                        errorToast('Please check room availability first!');
+                        errorToast('Please select an available room to continue!');
                         return;
                       }
                       handleStepOne();
                     }}
-                    className="flex h-12 items-center gap-2 rounded-2xl bg-[#0F2942] px-8 font-bold shadow-lg shadow-blue-100 transition-all hover:scale-105"
+                    className="flex h-12 items-center gap-2 rounded-2xl !bg-[#F26E22] px-8 font-bold text-white shadow-lg shadow-orange-100 transition-all hover:!bg-[#D95C1A] disabled:!bg-gray-200 disabled:!text-gray-400"
                   >
                     Next <ArrowRight size={16} />
                   </Button>
@@ -722,7 +768,6 @@ const Reservations = () => {
                   <RangePicker
                     className="h-12 w-full shadow-sm"
                     disabledDate={disabledDate}
-                    onChange={() => setIsAvailabilityChecked(false)}
                   />
                 </Form.Item>
 
@@ -737,7 +782,6 @@ const Reservations = () => {
                         size="large"
                         className="rounded-xl"
                         placeholder="Select Type"
-                        onChange={() => setIsAvailabilityChecked(false)}
                       >
                         {roomTypes?.data?.map((item: RoomType) => (
                           <Option key={item.typeId} value={item.typeId}>
@@ -749,32 +793,70 @@ const Reservations = () => {
                   </Col>
                   <Col span={12}>
                     <Form.Item
-                      label="Guest Count"
+                      label={
+                        <span className="text-xs font-semibold text-[#0B1B3D]">
+                          Max Occupancy (Guests)
+                        </span>
+                      }
                       name="guestCount"
-                      rules={[{ required: true }]}
+                      rules={[
+                        { required: true, message: 'Please select a room type' },
+                      ]}
                     >
                       <Input
                         type="number"
                         size="large"
-                        placeholder="Enter count"
-                        className="rounded-xl"
-                        min={1}
+                        placeholder="Auto-filled from Room Type"
+                        className="rounded-xl !bg-gray-50 !text-[#092968] font-bold cursor-not-allowed"
+                        readOnly
                       />
                     </Form.Item>
                   </Col>
                 </Row>
 
-                <Button
-                  type="default"
-                  className="h-12 w-full rounded-2xl border-2 border-blue-100 bg-blue-50/50 font-bold text-blue-600 transition-all hover:bg-blue-100"
-                  loading={isSearching}
-                  onClick={checkAvailability}
-                >
-                  Check Room Availability
-                </Button>
+                {/* Loading state during automatic room search */}
+                {isSearching && (
+                  <div className="flex items-center justify-center gap-2 py-6 text-sm font-semibold text-[#F26E22]">
+                    <Spin size="small" /> Checking room availability...
+                  </div>
+                )}
 
-                {isAvailabilityChecked && (
-                  <div className="animate-in zoom-in space-y-4 pt-4 duration-500">
+                {/* No available rooms message banner */}
+                {!isSearching && hasSearchedRooms && drawerAvailableRooms.length === 0 && (
+                  <div className="animate-in fade-in my-4 rounded-2xl border border-amber-200 bg-amber-50/90 p-5 text-center shadow-sm duration-300">
+                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                      <BedDouble size={20} />
+                    </div>
+                    <h4 className="text-base font-bold text-[#092968]">No Available Rooms</h4>
+                    <p className="mt-1 text-xs text-amber-800">
+                      There are no rooms available for the selected stay dates and room type. Please select a different date range or room type.
+                    </p>
+                  </div>
+                )}
+
+                {/* Available rooms and options */}
+                {!isSearching && isAvailabilityChecked && drawerAvailableRooms.length > 0 && (
+                  <div className="animate-in zoom-in space-y-4 pt-2 duration-500">
+                    {/* Available Room Count Notification Banner */}
+                    <div className="animate-in fade-in flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 shadow-sm duration-300">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                          <CheckCircle2 size={18} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-emerald-900">
+                            {drawerAvailableRooms.length} {drawerAvailableRooms.length === 1 ? 'Room' : 'Rooms'} Available
+                          </p>
+                          <p className="text-[11px] text-emerald-700">
+                            Found available {drawerAvailableRooms.length === 1 ? 'room' : 'rooms'} for the selected stay dates
+                          </p>
+                        </div>
+                      </div>
+                      <Tag color="success" className="rounded-lg px-2.5 py-0.5 text-xs font-bold">
+                        {drawerAvailableRooms.length} AVAILABLE
+                      </Tag>
+                    </div>
+
                     <Divider className="my-2" />
                     <Form.Item
                       label="Available Rooms"
@@ -924,66 +1006,88 @@ const Reservations = () => {
                 )}
               </div>
 
-              {/* STEP 2: GUEST IDENTIFICATION */}
+              {/* STEP 2: GUEST DETAILS */}
               <div
                 className={`${
                   current === 1 ? 'block' : 'hidden'
-                } animate-in slide-in-from-right duration-500`}
+                } animate-in slide-in-from-right space-y-4 duration-500`}
               >
-                <div className="mb-8 rounded-[2rem] border border-gray-200 bg-gray-50 p-6">
-                  <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-gray-400">
-                    Identity Check
+                <div className="mb-4">
+                  <h4 className="font-spaceGrotesk text-lg font-bold text-[#092968]">
+                    Guest Information
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    Enter the guest's National Identity Card (NIC) to check existing records or register as a new guest.
                   </p>
-                  <Input.Search
-                    placeholder="Search by nic"
-                    size="large"
-                    enterButton="Find Guest"
-                    loading={isSearchingGuest}
-                    onSearch={handleGuestSearch}
-                    className="overflow-hidden shadow-sm"
-                  />
                 </div>
 
+                {/* 1. NIC Field (First) */}
                 <Form.Item
-                  label="Full Name"
-                  name="guestName"
-                  rules={[{ required: true }]}
+                  label={
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-semibold text-[#0B1B3D]">
+                        National Identity Card (NIC)
+                      </span>
+                      {isExistingGuest === true && (
+                        <Tag color="success" className="rounded-md text-[10px] font-bold">
+                          Existing Guest
+                        </Tag>
+                      )}
+                      {isExistingGuest === false && (
+                        <Tag color="blue" className="rounded-md text-[10px] font-bold">
+                          New Guest
+                        </Tag>
+                      )}
+                    </div>
+                  }
+                  name="nic"
+                  rules={[
+                    { required: true, message: 'Please enter guest NIC' },
+                    {
+                      pattern: /^([0-9]{9}[vVxX]|[0-9]{12})$/,
+                      message: 'Enter a valid NIC (e.g., 123456789V or 123456789012)',
+                    },
+                  ]}
                 >
                   <Input
-                    placeholder="Enter guest full name"
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl hover:border-[#F26E22] focus:border-[#F26E22]"
+                    placeholder="Enter NIC (e.g., 199012345678 or 901234567V)"
+                    onBlur={handleNicBlur}
+                    suffix={
+                      isSearchingGuest ? (
+                        <Spin size="small" />
+                      ) : null
+                    }
                   />
                 </Form.Item>
 
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item
-                      label="NIC "
-                      name="nic"
-                      rules={[
-                        { required: true },
-                        {
-                          pattern: /^([0-9]{9}[vVxX]|[0-9]{12})$/,
-                          message: 'Enter a valid NIC (e.g., 123456789V or 123456789012)',
-                        },
-                      ]}
-                    >
-                      <Input className="h-11 rounded-xl" placeholder="Enter NIC " />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      label="Contact No"
-                      name="phone"
-                      rules={[{ required: true }]}
-                    >
-                      <Input
-                        className="h-11 rounded-xl"
-                        placeholder="Enter Contact Number"
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
+                {/* 2. Full Name Field */}
+                <Form.Item
+                  label={
+                    <span className="text-xs font-semibold text-[#0B1B3D]">Full Name</span>
+                  }
+                  name="guestName"
+                  rules={[{ required: true, message: 'Please enter guest full name' }]}
+                >
+                  <Input
+                    placeholder="Enter guest full name"
+                    className="h-11 rounded-xl hover:border-[#F26E22] focus:border-[#F26E22]"
+                  />
+                </Form.Item>
+
+                {/* 3. Contact No Field */}
+                <Form.Item
+                  label={
+                    <span className="text-xs font-semibold text-[#0B1B3D]">Contact Number</span>
+                  }
+                  name="phone"
+                  rules={[{ required: true, message: 'Please enter contact number' }]}
+                >
+                  <Input
+                    className="h-11 rounded-xl hover:border-[#F26E22] focus:border-[#F26E22]"
+                    placeholder="Enter Contact Number (e.g., 0771234567)"
+                  />
+                </Form.Item>
               </div>
 
               {/* STEP 3: BILLING & CONFIRMATION */}

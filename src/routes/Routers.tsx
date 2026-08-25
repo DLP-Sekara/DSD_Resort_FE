@@ -6,6 +6,7 @@ import DashboardLayout from '../layout/DashboardLayout';
 import Reservations from '../pages/reservations/Reservations';
 import Rooms from '../pages/rooms/Rooms';
 import MealManagement from '../pages/mealManagement/MealManagement';
+import RestaurantOrders from '../pages/restaurantOrders/RestaurantOrders';
 import BillingReport from '../pages/billingReport/BillingReport';
 import Users from '../pages/users/Users';
 import Settings from '../pages/settings/Settings';
@@ -29,6 +30,7 @@ const Routers = () => {
           <Route path="reservations" element={<Reservations />} />
           <Route path="rooms" element={<Rooms />} />
           <Route path="meal-management" element={<MealManagement />} />
+          <Route path="restaurant-orders" element={<RestaurantOrders />} />
           <Route path="billing-report" element={<BillingReport />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />

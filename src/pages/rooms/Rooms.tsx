@@ -380,7 +380,7 @@ const Rooms = () => {
         </div>
       </Drawer>
 
-      {/*Add new room type  */}
+      {/*Add new room type Model */}
       <ActionDialog
         modalOpen={roomTypeModalOpen}
         handleCancel={() => setRoomTypeModalOpen(false)}
