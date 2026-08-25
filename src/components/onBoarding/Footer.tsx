@@ -4,7 +4,7 @@ const Footer = () => {
       <div className="relative mt-[-1.00px] w-fit text-center font-['Inter',Helvetica] text-xs font-normal leading-3 tracking-[0] text-[#3f3f3f] lg:text-sm">
         ©{' '}
         <span className="font-['DM_Sans',Helvetica]">
-          2026 Ocean View Resort-All rights reserved
+          2026 DSD Resort - All rights reserved
         </span>
       </div>
 
@@ -13,7 +13,7 @@ const Footer = () => {
           href="/user-guide"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[#0168ff] underline"
+          className="text-[#092968] underline font-semibold transition-colors duration-200 hover:text-[#F26E22]"
         >
           View User Guide
         </a>

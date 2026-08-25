@@ -1,5 +1,5 @@
 import { axiosInstance } from '../config/axiosService';
-import type { APIResponse } from '../types/onBoarding.interfaces';
+import type { APIResponse, ChangePasswordTypes } from '../types/onBoarding.interfaces';
 import type { UserAccount, ServiceRequestArgs } from '../types/services.interfaces';
 
 const handleRequest = async ({
@@ -23,8 +23,8 @@ const settingService = () => {
     addNewAdmin: (data: UserAccount) =>
       handleRequest({ url: 'api/v1/auth/signup', data, method: 'post' }),
 
-    changePassword: (data: any) =>
-      handleRequest({ url: 'api/v1/settings/change-password', data, method: 'post' }),
+    changePassword: (data: ChangePasswordTypes) =>
+      handleRequest({ url: 'api/v1/auth/change-password', data, method: 'post' }),
 
     getCurrentSessions: () =>
       handleRequest({ url: 'api/v1/settings/sessions', method: 'get' }),

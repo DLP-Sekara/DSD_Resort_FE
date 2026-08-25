@@ -53,3 +53,10 @@ export interface ResetPasswordPayloadTypes {
   confirmPassword: string;
 }
 
+export interface ChangePasswordTypes {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+

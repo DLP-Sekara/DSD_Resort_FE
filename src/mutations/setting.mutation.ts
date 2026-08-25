@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { errorToast, successToast } from '../components/common/Alert';
-import type { APIResponse } from '../types/onBoarding.interfaces';
+import type { APIResponse, ChangePasswordTypes } from '../types/onBoarding.interfaces';
 import type { UserAccount } from '../types/services.interfaces';
 import settingService from '../services/setting.services';
 
@@ -27,7 +27,7 @@ const settingMutation = () => {
 
   const changePasswordMutation = () => {
     return useMutation({
-      mutationFn: (data: any) => changePassword(data),
+      mutationFn: (data: ChangePasswordTypes) => changePassword(data),
       onSuccess: (response: APIResponse) => {
         if (response.success) {
           successToast(response.message);

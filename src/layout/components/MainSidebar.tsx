@@ -43,48 +43,58 @@ const MainSidebar = ({
   ];
 
   return (
-    <div className="flex h-screen w-64 flex-col bg-[#0F2942] text-white shadow-xl">
+    <div className="flex h-screen w-64 flex-col bg-[#092968] text-white shadow-xl">
       {/* Logo Section */}
-      <div className="flex flex-col items-center border-b border-blue-900/50 p-6">
-        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500 bg-gradient-to-br from-blue-400 to-blue-700 shadow-lg">
-          <span className="text-2xl font-bold">DSD</span>
+      <div className="flex flex-col items-center border-b border-white/10 p-6">
+        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F26E22] text-white shadow-lg text-xl font-bold font-spaceGrotesk">
+          <span>DSD</span>
         </div>
-        <h1 className="text-lg font-bold uppercase tracking-wider">DSD RESORT</h1>
-        <p className="text-[10px] tracking-[0.2em] text-blue-300">Management</p>
+        <h1 className="font-spaceGrotesk text-lg font-extrabold uppercase tracking-wider text-white">
+          DSD RESORT
+        </h1>
+        <p className="text-[11px] font-bold tracking-[0.25em] text-[#F26E22]">
+          ADMIN PORTAL
+        </p>
       </div>
 
       {/* Navigation Items */}
-      <nav className="mt-6 flex-1 space-y-2 px-4">
+      <nav className="mt-6 flex-1 space-y-1.5 px-4">
         {menuItems.map((item, index) => {
           const isActive = location.pathname === item.path;
           return (
             <Link
               to={item.path}
               key={index}
-              className={`group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3 transition-all duration-200 hover:bg-blue-600/20 hover:text-blue-300 ${isActive ? 'bg-blue-600/20 text-blue-300' : ''}`}
+              className={`group flex cursor-pointer items-center gap-3.5 rounded-xl px-4 py-3 transition-all duration-200 ${
+                isActive
+                  ? 'bg-[#F26E22] text-white font-bold shadow-md'
+                  : 'text-white/85 hover:bg-white/10 hover:text-white'
+              }`}
             >
               <div
-                className={`group-hover:text-blue-300 ${isActive ? 'text-blue-300' : 'text-blue-400'}`}
+                className={`transition-colors ${
+                  isActive ? 'text-white' : 'text-[#F26E22] group-hover:text-white'
+                }`}
               >
                 {item.icon}
               </div>
-              <span className="text-sm font-medium">{item.name}</span>
+              <span className="text-sm font-semibold">{item.name}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* 🚪 Logout Section */}
-      <div className="border-t border-blue-900/50 p-4">
+      <div className="border-t border-white/10 p-4">
         <Button
           loading={loading}
           onClick={() => {
             handleLogout();
           }}
-          className="flex w-full items-center gap-4 rounded-xl bg-red-500/10 px-4 py-3 text-red-400 transition-all duration-300 hover:bg-red-500 hover:text-white border-none"
+          className="flex h-11 w-full items-center justify-start gap-3 rounded-xl bg-red-500/15 px-4 py-2 text-red-300 transition-all duration-300 hover:!bg-red-600 hover:!text-white border-none font-semibold text-sm"
         >
           <LogOut size={20} />
-          <span className="text-sm font-medium">Log Out</span>
+          <span>Log Out</span>
         </Button>
       </div>
     </div>
