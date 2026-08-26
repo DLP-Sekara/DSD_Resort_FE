@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   Tag,
@@ -21,6 +22,7 @@ import type { MealPlan, FoodItem } from '../../types/services.interfaces';
 const { Option } = Select;
 
 const MealManagement = () => {
+  const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerType, setDrawerType] = useState('add');
   const [isFoodItemDrawerOpen, setIsFoodItemDrawerOpen] = useState(false);
@@ -218,11 +220,11 @@ const MealManagement = () => {
           <Button
             size="large"
             onClick={() => {
-              setIsFoodItemDrawerOpen(true);
+              navigate('/dashboard/kitchen-management');
             }}
             className="flex h-12 items-center gap-2 rounded-xl border-none bg-orange-500 text-white shadow-lg hover:bg-orange-600"
           >
-            Food Items
+            Kitchen & Food Items
           </Button>
         </div>
       </div>

@@ -38,4 +38,45 @@ export const UNITS_OF_MEASURE = [
   { value: 'can', label: 'Cans (can)' },
   { value: 'bottle', label: 'Bottles (bottle)' },
   { value: 'box', label: 'Boxes (box)' },
+  { value: 'unit', label: 'Unit (unit)' },
 ] as const;
+
+export interface BOMTemplateItem {
+  templateItemId?: string;
+  materialId: string;
+  qtyPerPerson: number;
+  materialName?: string;
+  unitOfMeasure?: string;
+  rawMaterial?: RawMaterial;
+}
+
+export interface BOMTemplate {
+  templateId?: string;
+  id?: string;
+  templateName: string;
+  createdBy: string;
+  itemId: string;
+  items?: BOMTemplateItem[];
+  templateItems?: BOMTemplateItem[];
+  foodItem?: {
+    itemId: string;
+    name: string;
+    unitPrice?: number;
+  };
+  createdByUser?: {
+    adminId?: string;
+    userId?: string;
+    name?: string;
+    role?: string;
+  };
+}
+
+export interface CreateBOMTemplateDTO {
+  templateName: string;
+  createdBy: string;
+  itemId: string;
+  items: {
+    materialId: string;
+    qtyPerPerson: number;
+  }[];
+}
