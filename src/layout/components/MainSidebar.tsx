@@ -8,12 +8,14 @@ import {
   ChefHat,
   Flame,
   Receipt,
+  MessageSquareQuote,
   Users,
   Settings,
   LogOut,
 } from 'lucide-react';
 
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 const MainSidebar = ({
   handleLogout,
@@ -23,6 +25,9 @@ const MainSidebar = ({
   loading: boolean;
 }) => {
   const location = useLocation();
+  const { userData } = useAuth();
+  const userRole = (userData?.role || 'ADMIN').toUpperCase();
+
   const menuItems = [
     { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
     {
@@ -52,6 +57,11 @@ const MainSidebar = ({
       path: '/dashboard/chef-desk',
     },
     {
+      name: 'Guest Feedback',
+      icon: <MessageSquareQuote size={20} />,
+      path: '/dashboard/guest-feedback',
+    },
+    {
       name: 'Billing & Reports',
       icon: <Receipt size={20} />,
       path: '/dashboard/billing-report',
@@ -59,6 +69,43 @@ const MainSidebar = ({
     { name: 'Users', icon: <Users size={20} />, path: '/dashboard/users' },
     { name: 'Settings', icon: <Settings size={20} />, path: '/dashboard/settings' },
   ];
+
+  // Role-based visibility filtering
+  const allowedMenuItems = menuItems.filter((item) => {
+    if (userRole === 'ADMIN') return true;
+
+    if (userRole === 'HEAD_CHEF' || userRole === 'CHEF') {
+      return (
+        item.path === '/dashboard/kitchen-management' ||
+        item.path === '/dashboard/chef-desk'
+      );
+    }
+
+    if (userRole === 'RECEPTIONIST') {
+      return (
+        item.path === '/dashboard' ||
+        item.path === '/dashboard/reservations' ||
+        item.path === '/dashboard/restaurant-orders' ||
+        item.path === '/dashboard/rooms' ||
+        item.path === '/dashboard/billing-report'
+      );
+    }
+
+    return true;
+  });
+
+  const getRoleDisplayTitle = (role: string) => {
+    switch (role) {
+      case 'HEAD_CHEF':
+      case 'CHEF':
+        return 'KITCHEN OPS';
+      case 'RECEPTIONIST':
+        return 'FRONT DESK';
+      case 'ADMIN':
+      default:
+        return 'ADMIN PORTAL';
+    }
+  };
 
   return (
     <div className="flex h-screen w-64 flex-col bg-[#092968] text-white shadow-xl">
@@ -71,13 +118,13 @@ const MainSidebar = ({
           DSD RESORT
         </h1>
         <p className="text-[11px] font-bold tracking-[0.25em] text-[#F26E22]">
-          ADMIN PORTAL
+          {getRoleDisplayTitle(userRole)}
         </p>
       </div>
 
       {/* Navigation Items */}
-      <nav className="mt-6 flex-1 space-y-1.5 px-4">
-        {menuItems.map((item, index) => {
+      <nav className="mt-6 flex-1 space-y-1.5 px-4 overflow-y-auto">
+        {allowedMenuItems.map((item, index) => {
           const isActive = location.pathname === item.path;
           return (
             <Link
