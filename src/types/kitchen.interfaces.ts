@@ -80,3 +80,34 @@ export interface CreateBOMTemplateDTO {
     qtyPerPerson: number;
   }[];
 }
+
+export interface RawMaterialDetailItem {
+  materialId: string;
+  materialName: string;
+  category: string;
+  unitOfMeasure: string;
+  qtyPerPerson: number;
+  orderedQty: number;
+  totalRequiredQty: number;
+  quantityOnHand: number;
+  status: string;
+  isShortage: boolean;
+  shortageQty: number;
+}
+
+export interface CalculatedOrderBOMFoodItem {
+  ItemId?: string;
+  itemId?: string;
+  itemName: string;
+  required_quantity: number;
+  rawMaterialDetails: RawMaterialDetailItem[];
+}
+
+export interface CalculateOrderBOMDTO {
+  orderId: string;
+  orderDetails: {
+    itemId: string;
+    orderedQty: number;
+  }[];
+}
+

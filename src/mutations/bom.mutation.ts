@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { errorToast, successToast } from '../components/common/Alert';
 import type { APIResponse } from '../types/onBoarding.interfaces';
-import type { CreateBOMTemplateDTO } from '../types/kitchen.interfaces';
+import type {
+  CreateBOMTemplateDTO,
+  CalculateOrderBOMDTO,
+} from '../types/kitchen.interfaces';
 import bomService from '../services/bom.services';
 
 const bomMutation = () => {
@@ -11,6 +14,7 @@ const bomMutation = () => {
     getBOMTemplateById,
     getAllBOMTemplates,
     deleteBOMTemplate,
+    calculateOrderBOM,
   } = bomService();
 
   const getAllBOMTemplatesQuery = () => {
@@ -62,11 +66,18 @@ const bomMutation = () => {
     });
   };
 
+  const calculateOrderBOMMutation = () => {
+    return useMutation({
+      mutationFn: (data: CalculateOrderBOMDTO) => calculateOrderBOM(data),
+    });
+  };
+
   return {
     getAllBOMTemplatesQuery,
     getBOMTemplateByIdQuery,
     createBOMTemplateMutation,
     deleteBOMTemplateMutation,
+    calculateOrderBOMMutation,
   };
 };
 

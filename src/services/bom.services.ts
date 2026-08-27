@@ -1,7 +1,10 @@
 import { axiosInstance } from '../config/axiosService';
 import type { APIResponse } from '../types/onBoarding.interfaces';
 import type { ServiceRequestArgs } from '../types/services.interfaces';
-import type { CreateBOMTemplateDTO } from '../types/kitchen.interfaces';
+import type {
+  CreateBOMTemplateDTO,
+  CalculateOrderBOMDTO,
+} from '../types/kitchen.interfaces';
 
 const handleRequest = async ({
   url,
@@ -44,6 +47,13 @@ const bomService = () => {
       handleRequest({
         url: `api/v1/bom-templates/delete/${templateId}`,
         method: 'delete',
+      }),
+
+    calculateOrderBOM: (data: CalculateOrderBOMDTO) =>
+      handleRequest({
+        url: 'api/v1/bom-templates/calculate-order-bom',
+        data,
+        method: 'post',
       }),
   };
 };

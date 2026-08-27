@@ -9,6 +9,7 @@ import {
   Card,
   Progress,
   Tooltip,
+  Spin,
 } from 'antd';
 import {
   Flame,
@@ -35,9 +36,13 @@ import {
   FlameKindling,
   Timer,
   Eye,
+  Printer,
+  Download,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 import kitchenMutation from '../../mutations/kitchen.mutation';
 import mealMutation from '../../mutations/meal.mutation';
@@ -45,7 +50,12 @@ import bomMutation from '../../mutations/bom.mutation';
 import restaurantOrderMutation from '../../mutations/restaurantOrder.mutation';
 import { useAuth } from '../../hooks/useAuth';
 import { successToast, errorToast } from '../../components/common/Alert';
-import type { RawMaterial, BOMTemplate } from '../../types/kitchen.interfaces';
+import type {
+  RawMaterial,
+  BOMTemplate,
+  CalculatedOrderBOMFoodItem,
+  CalculateOrderBOMDTO,
+} from '../../types/kitchen.interfaces';
 import type { FoodItem } from '../../types/services.interfaces';
 import type {
   KDSOrderTicket,
@@ -503,13 +513,14 @@ const ChefOperationsDesk: React.FC = () => {
   // -------------------------------------------------------------------------
   const { getAllRawMaterialsQuery } = kitchenMutation();
   const { getAllFoodItemsMutation } = mealMutation();
-  const { getAllBOMTemplatesQuery } = bomMutation();
+  const { getAllBOMTemplatesQuery, calculateOrderBOMMutation } = bomMutation();
   const { getAllRestaurantOrdersQuery, updateRestaurantOrderStatusMutation } =
     restaurantOrderMutation();
 
   const { data: rawMaterialsRes } = getAllRawMaterialsQuery();
   const { data: foodItemsRes } = getAllFoodItemsMutation();
   const { data: bomTemplatesRes } = getAllBOMTemplatesQuery();
+  const { mutateAsync: calculateOrderBOMApi } = calculateOrderBOMMutation();
   const { data: ordersRes, refetch: refetchOrders } = getAllRestaurantOrdersQuery({
     isKitchenPrepared: true,
   });
@@ -694,9 +705,11 @@ const ChefOperationsDesk: React.FC = () => {
   );
 
   // -------------------------------------------------------------------------
-  // TAB 1 (BULK MEALS): BOM CALCULATION MODAL
+  // TAB 1 (BULK MEALS & KDS): BOM CALCULATION MODAL
   // -------------------------------------------------------------------------
   const [bomModalOpen, setBomModalOpen] = useState(false);
+  const [orderBOMResults, setOrderBOMResults] = useState<CalculatedOrderBOMFoodItem[]>([]);
+  const [isCalculatingOrderBOM, setIsCalculatingOrderBOM] = useState(false);
   const [selectedBulkItem, setSelectedBulkItem] = useState<{
     dishName: string;
     portionCount: number;
@@ -706,6 +719,246 @@ const ChefOperationsDesk: React.FC = () => {
     orderNumber?: string;
     items?: { itemId?: string; name: string; quantity: number }[];
   } | null>(null);
+
+  // Fetch and Calculate BOM from Backend API for Order
+  const fetchAndCalculateOrderBOM = async (ticket: KDSOrderTicket) => {
+    setSelectedBulkItem({
+      dishName:
+        ticket.items.length === 1
+          ? ticket.items[0].name
+          : `Order ${ticket.orderNumber} (${ticket.items.length} Dishes)`,
+      portionCount: ticket.items.reduce((s, i) => s + (i.quantity || 1), 0),
+      mealSession: 'A_LA_CARTE',
+      itemId: ticket.items[0]?.itemId,
+      orderTicketId: ticket.id,
+      orderNumber: ticket.orderNumber,
+      items: ticket.items,
+    });
+    setIsOrderModalOpen(false);
+    setBomModalOpen(true);
+    setIsCalculatingOrderBOM(true);
+    setOrderBOMResults([]);
+
+    try {
+      const payload: CalculateOrderBOMDTO = {
+        orderId: ticket.id,
+        orderDetails: ticket.items.map((it) => ({
+          itemId: it.itemId,
+          orderedQty: it.quantity || 1,
+        })),
+      };
+      const res: any = await calculateOrderBOMApi(payload);
+      if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setOrderBOMResults(res.data);
+      } else {
+        // Fallback calculation per item if API response is empty
+        const fallbackResults: CalculatedOrderBOMFoodItem[] = ticket.items.map((it) => {
+          const itemQty = it.quantity || 1;
+          const breakdown = calculateBOMBreakdown(it.name, itemQty, it.itemId);
+          return {
+            ItemId: it.itemId,
+            itemId: it.itemId,
+            itemName: it.name,
+            required_quantity: itemQty,
+            rawMaterialDetails: breakdown.materials.map((m) => ({
+              materialId: m.materialId,
+              materialName: m.materialName,
+              category: m.category,
+              unitOfMeasure: m.unitOfMeasure,
+              qtyPerPerson: m.qtyPerPerson,
+              orderedQty: itemQty,
+              totalRequiredQty: m.totalRequiredQty,
+              quantityOnHand: m.quantityOnHand,
+              status: m.isShortage ? 'Shortage' : 'In Stock',
+              isShortage: m.isShortage,
+              shortageQty: m.shortageQty,
+            })),
+          };
+        });
+        setOrderBOMResults(fallbackResults);
+      }
+    } catch (err) {
+      console.error('Failed to calculate BOM via backend API:', err);
+      // Fallback calculation per item
+      const fallbackResults: CalculatedOrderBOMFoodItem[] = ticket.items.map((it) => {
+        const itemQty = it.quantity || 1;
+        const breakdown = calculateBOMBreakdown(it.name, itemQty, it.itemId);
+        return {
+          ItemId: it.itemId,
+          itemId: it.itemId,
+          itemName: it.name,
+          required_quantity: itemQty,
+          rawMaterialDetails: breakdown.materials.map((m) => ({
+            materialId: m.materialId,
+            materialName: m.materialName,
+            category: m.category,
+            unitOfMeasure: m.unitOfMeasure,
+            qtyPerPerson: m.qtyPerPerson,
+            orderedQty: itemQty,
+            totalRequiredQty: m.totalRequiredQty,
+            quantityOnHand: m.quantityOnHand,
+            status: m.isShortage ? 'Shortage' : 'In Stock',
+            isShortage: m.isShortage,
+            shortageQty: m.shortageQty,
+          })),
+        };
+      });
+      setOrderBOMResults(fallbackResults);
+    } finally {
+      setIsCalculatingOrderBOM(false);
+    }
+  };
+
+  const orderBOMSummary = useMemo(() => {
+    if (!orderBOMResults || orderBOMResults.length === 0) return null;
+
+    let totalPortions = 0;
+    let totalRawMaterialsCount = 0;
+    let totalShortagesCount = 0;
+
+    orderBOMResults.forEach((dish) => {
+      totalPortions += dish.required_quantity || 0;
+      if (dish.rawMaterialDetails) {
+        totalRawMaterialsCount += dish.rawMaterialDetails.length;
+        totalShortagesCount += dish.rawMaterialDetails.filter((r) => r.isShortage).length;
+      }
+    });
+
+    return {
+      totalPortions,
+      totalDishes: orderBOMResults.length,
+      totalRawMaterialsCount,
+      totalShortagesCount,
+    };
+  }, [orderBOMResults]);
+
+  // -------------------------------------------------------------------------
+  // PRINT & DOWNLOAD PDF HELPERS FOR BOM CALCULATION
+  // -------------------------------------------------------------------------
+  const [isDownloadingBOMPDF, setIsDownloadingBOMPDF] = useState(false);
+
+  const handlePrintBOMDetails = (elementId: string) => {
+    const content = document.getElementById(elementId);
+    if (!content) {
+      window.print();
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=900,height=1000');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>BOM Recipe Breakdown - ${selectedBulkItem?.orderNumber || selectedBulkItem?.dishName || 'Kitchen'}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 12mm 10mm;
+              }
+              body {
+                margin: 0;
+                padding: 10px;
+                background: #ffffff !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                color: #000000;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body class="p-6 bg-white flex flex-col items-center">
+          <div class="w-full max-w-3xl">
+            <!-- Header -->
+            <div class="border-b-2 border-slate-800 pb-4 mb-5 flex justify-between items-start">
+              <div>
+                <h1 class="text-2xl font-black tracking-tight text-[#092968]">DSD RESORT & SPA</h1>
+                <p class="text-xs font-bold uppercase tracking-wider text-[#F26E22]">Kitchen Operations & BOM Production Slip</p>
+                <p class="text-xs text-slate-500 mt-1">Generated on: ${dayjs().format('DD MMM YYYY, hh:mm A')}</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-block bg-[#092968] text-white text-xs font-extrabold px-3 py-1 rounded-md">
+                  ${selectedBulkItem?.orderNumber ? `ORDER ${selectedBulkItem.orderNumber}` : 'BULK PREP'}
+                </span>
+                <p class="text-xs font-bold text-slate-700 mt-1">
+                  ${selectedKdsTicket?.guestName || 'Dine-In Guest'}
+                </p>
+                <p class="text-[11px] text-slate-500">
+                  Server: ${selectedKdsTicket?.serverName || 'Kitchen Staff'}
+                </p>
+              </div>
+            </div>
+
+            ${content.outerHTML}
+
+            <!-- Footer Signatures -->
+            <div class="mt-8 pt-4 border-t border-dashed border-slate-300 grid grid-cols-2 text-xs text-slate-600">
+              <div>
+                <p class="font-bold">Executive Chef / Head Cook:</p>
+                <div class="mt-8 border-b border-slate-400 w-48"></div>
+              </div>
+              <div class="text-right">
+                <p class="font-bold">Pantry / Inventory Storekeeper:</p>
+                <div class="mt-8 border-b border-slate-400 w-48 ml-auto"></div>
+              </div>
+            </div>
+          </div>
+          <script>
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 600);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleDownloadBOMPDF = async (elementId: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) {
+      errorToast('BOM Details content not found for PDF export.');
+      return;
+    }
+
+    setIsDownloadingBOMPDF(true);
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const filename = `BOM_Calculation_${selectedBulkItem?.orderNumber || 'Report'}_${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
+      pdf.save(filename);
+      successToast('BOM Calculation PDF downloaded successfully!');
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      errorToast('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsDownloadingBOMPDF(false);
+    }
+  };
 
   const calculateBOMBreakdown = (
     dishName: string,
@@ -2265,23 +2518,7 @@ const ChefOperationsDesk: React.FC = () => {
             <button
               key="start-cooking"
               onClick={() => {
-                setSelectedBulkItem({
-                  dishName:
-                    selectedKdsTicket.items.length === 1
-                      ? selectedKdsTicket.items[0].name
-                      : `Order ${selectedKdsTicket.orderNumber} (${selectedKdsTicket.items.length} Dishes)`,
-                  portionCount: selectedKdsTicket.items.reduce(
-                    (s, i) => s + (i.quantity || 1),
-                    0,
-                  ),
-                  mealSession: 'A_LA_CARTE',
-                  itemId: selectedKdsTicket.items[0]?.itemId,
-                  orderTicketId: selectedKdsTicket.id,
-                  orderNumber: selectedKdsTicket.orderNumber,
-                  items: selectedKdsTicket.items,
-                });
-                setIsOrderModalOpen(false);
-                setBomModalOpen(true);
+                fetchAndCalculateOrderBOM(selectedKdsTicket);
               }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-bold text-white shadow-md hover:bg-[#d95a14] active:scale-95"
             >
@@ -2435,23 +2672,7 @@ const ChefOperationsDesk: React.FC = () => {
             <div className="pt-2">
               <button
                 onClick={() => {
-                  setSelectedBulkItem({
-                    dishName:
-                      selectedKdsTicket.items.length === 1
-                        ? selectedKdsTicket.items[0].name
-                        : `Order ${selectedKdsTicket.orderNumber} (${selectedKdsTicket.items.length} Dishes)`,
-                    portionCount: selectedKdsTicket.items.reduce(
-                      (s, i) => s + (i.quantity || 1),
-                      0,
-                    ),
-                    mealSession: 'A_LA_CARTE',
-                    itemId: selectedKdsTicket.items[0]?.itemId,
-                    orderTicketId: selectedKdsTicket.id,
-                    orderNumber: selectedKdsTicket.orderNumber,
-                    items: selectedKdsTicket.items,
-                  });
-                  setIsOrderModalOpen(false);
-                  setBomModalOpen(true);
+                  fetchAndCalculateOrderBOM(selectedKdsTicket);
                 }}
                 className="active:scale-98 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#092968] text-sm font-extrabold text-white shadow-md transition-all hover:bg-[#0c3585]"
               >
@@ -2468,27 +2689,52 @@ const ChefOperationsDesk: React.FC = () => {
       {/* ========================================================================= */}
       <Modal
         title={
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-[#F26E22]">
-              <Boxes size={20} />
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 pr-2">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-[#F26E22]">
+                <Boxes size={20} />
+              </div>
+              <div>
+                <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
+                  {selectedBulkItem?.orderNumber
+                    ? `Order ${selectedBulkItem.orderNumber} • BOM Recipe Calculation`
+                    : 'BOM Raw Material Breakdown'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {selectedBulkItem?.orderNumber
+                    ? `Recipe & Stock Breakdown for ${selectedBulkItem?.portionCount} Portions (${selectedBulkItem?.items?.length || 1} Dishes)`
+                    : `Calculated Recipe Quantities for ${selectedBulkItem?.dishName} (${selectedBulkItem?.portionCount} Portions)`}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
-                {selectedBulkItem?.orderNumber
-                  ? `Order ${selectedBulkItem.orderNumber} • BOM Recipe Calculation`
-                  : 'BOM Raw Material Breakdown'}
-              </h3>
-              <p className="text-xs text-slate-400">
-                Calculated Recipe Quantities for {selectedBulkItem?.dishName} (
-                {selectedBulkItem?.portionCount} Portions)
-              </p>
-            </div>
+
+            {/* Print & Download Action Buttons in Header */}
+            {!isCalculatingOrderBOM && (
+              <div className="flex items-center gap-2">
+                <Button
+                  icon={<Printer size={14} />}
+                  onClick={() => handlePrintBOMDetails('bom-calculation-modal-content')}
+                  className="flex h-8 items-center gap-1.5 rounded-lg text-xs font-bold text-slate-700 hover:border-[#092968] hover:text-[#092968]"
+                >
+                  Print
+                </Button>
+                <Button
+                  icon={<Download size={14} />}
+                  loading={isDownloadingBOMPDF}
+                  onClick={() => handleDownloadBOMPDF('bom-calculation-modal-content')}
+                  className="flex h-8 items-center gap-1.5 rounded-lg text-xs font-bold text-slate-700 hover:border-[#092968] hover:text-[#092968]"
+                >
+                  PDF
+                </Button>
+              </div>
+            )}
           </div>
         }
         open={bomModalOpen}
         onCancel={() => {
           setBomModalOpen(false);
           setSelectedBulkItem(null);
+          setOrderBOMResults([]);
         }}
         footer={[
           selectedBulkItem?.orderTicketId ? (
@@ -2514,6 +2760,25 @@ const ChefOperationsDesk: React.FC = () => {
               Close
             </Button>
           ),
+          <Button
+            key="print-footer"
+            icon={<Printer size={15} />}
+            disabled={isCalculatingOrderBOM}
+            className="h-11 rounded-xl border-slate-300 px-4 font-bold text-slate-700 hover:border-[#092968] hover:text-[#092968]"
+            onClick={() => handlePrintBOMDetails('bom-calculation-modal-content')}
+          >
+            Print
+          </Button>,
+          <Button
+            key="download-pdf-footer"
+            icon={<Download size={15} />}
+            loading={isDownloadingBOMPDF}
+            disabled={isCalculatingOrderBOM}
+            className="h-11 rounded-xl border-slate-300 px-4 font-bold text-slate-700 hover:border-[#092968] hover:text-[#092968]"
+            onClick={() => handleDownloadBOMPDF('bom-calculation-modal-content')}
+          >
+            Download PDF
+          </Button>,
           selectedBulkItem?.orderTicketId ? (
             <button
               key="confirm-start-cooking"
@@ -2521,6 +2786,7 @@ const ChefOperationsDesk: React.FC = () => {
                 handleAdvanceKdsStatus(selectedBulkItem.orderTicketId!, 'PREPARING');
                 setBomModalOpen(false);
                 setSelectedBulkItem(null);
+                setOrderBOMResults([]);
               }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-bold text-white shadow-md hover:bg-[#d95a14] active:scale-95"
             >
@@ -2541,88 +2807,255 @@ const ChefOperationsDesk: React.FC = () => {
             </button>
           ),
         ]}
-        width={720}
+        width={780}
         centered
       >
-        {currentBOMBreakdown && (
-          <div className="space-y-4 py-3">
-            {/* Summary Bar */}
-            <div className="grid grid-cols-3 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase text-slate-400">
-                  Target Portions
-                </p>
-                <p className="font-mono text-xl font-black text-[#092968]">
-                  {currentBOMBreakdown.portions} Pax
-                </p>
+        {/* If Order BOM is calculating */}
+        {isCalculatingOrderBOM ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Spin size="large" />
+            <p className="mt-4 font-spaceGrotesk text-sm font-black text-[#092968]">
+              Calculating Recipe BOM with Live Inventory...
+            </p>
+            <p className="text-xs text-slate-400">
+              Querying raw material warehouse stocks and portion requirements
+            </p>
+          </div>
+        ) : selectedBulkItem?.orderTicketId && orderBOMResults.length > 0 ? (
+          <div id="bom-calculation-modal-content" className="max-h-[68vh] space-y-4 overflow-y-auto pr-1 py-1">
+            {/* Top Summary Bar */}
+            {orderBOMSummary && (
+              <div className="grid grid-cols-3 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">
+                    Target Portions
+                  </p>
+                  <p className="font-mono text-xl font-black text-[#092968]">
+                    {orderBOMSummary.totalPortions} Pax{' '}
+                    <span className="text-xs font-normal text-slate-400">
+                      ({orderBOMSummary.totalDishes}{' '}
+                      {orderBOMSummary.totalDishes === 1 ? 'Dish' : 'Dishes'})
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">
+                    Raw Materials Needed
+                  </p>
+                  <p className="font-mono text-xl font-black text-[#F26E22]">
+                    {orderBOMSummary.totalRawMaterialsCount} Items
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">
+                    Inventory Shortages
+                  </p>
+                  <p
+                    className={`font-mono text-xl font-black ${
+                      orderBOMSummary.totalShortagesCount === 0
+                        ? 'text-emerald-600'
+                        : 'text-rose-600'
+                    }`}
+                  >
+                    {orderBOMSummary.totalShortagesCount === 0
+                      ? 'All In Stock ✓'
+                      : `${orderBOMSummary.totalShortagesCount} Shortage!`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase text-slate-400">
-                  Raw Materials Needed
-                </p>
-                <p className="font-mono text-xl font-black text-[#F26E22]">
-                  {currentBOMBreakdown.totalRawMaterialsCount} Items
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase text-slate-400">
-                  Inventory Shortages
-                </p>
-                <p className="font-mono text-xl font-black text-emerald-600">
-                  {currentBOMBreakdown.shortageMaterialsCount === 0
-                    ? 'All In Stock ✓'
-                    : `${currentBOMBreakdown.shortageMaterialsCount} Shortage!`}
-                </p>
-              </div>
-            </div>
+            )}
 
-            {/* Materials Table */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-100 text-[11px] font-extrabold uppercase text-slate-600">
-                    <th className="px-3 py-2.5">Raw Material</th>
-                    <th className="px-3 py-2.5">Per Portion</th>
-                    <th className="px-3 py-2.5">Total Required</th>
-                    <th className="px-3 py-2.5">Warehouse Stock</th>
-                    <th className="px-3 py-2.5 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {currentBOMBreakdown.materials.map((mat, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-3 py-2.5 font-bold text-[#092968]">
-                        {mat.materialName}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-slate-500">
-                        {mat.qtyPerPerson} {mat.unitOfMeasure}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono font-black text-[#F26E22]">
-                        {mat.totalRequiredQty} {mat.unitOfMeasure}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-slate-700">
-                        {mat.quantityOnHand} {mat.unitOfMeasure}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        {mat.isShortage ? (
-                          <Tag color="error" className="rounded-md text-[10px] font-bold">
-                            Shortage ({mat.shortageQty} {mat.unitOfMeasure})
+            {/* SEPARATED FOOD ITEMS LIST */}
+            <div className="space-y-4">
+              {orderBOMResults.map((dish, dishIdx) => {
+                const dishShortages =
+                  dish.rawMaterialDetails?.filter((m) => m.isShortage).length || 0;
+                return (
+                  <div
+                    key={dish.ItemId || dish.itemId || dishIdx}
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                  >
+                    {/* Food Item Header Bar */}
+                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#092968] text-xs font-bold text-white">
+                          <Utensils size={14} />
+                        </div>
+                        <div>
+                          <h4 className="font-spaceGrotesk text-sm font-extrabold text-[#092968]">
+                            {dish.itemName}
+                          </h4>
+                          <p className="text-[11px] font-semibold text-slate-400">
+                            {dish.rawMaterialDetails?.length || 0} Recipe Ingredients
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Tag
+                          color="orange"
+                          className="m-0 rounded-lg px-2.5 py-0.5 font-mono text-xs font-extrabold"
+                        >
+                          {dish.required_quantity}× Portions
+                        </Tag>
+                        {dishShortages > 0 ? (
+                          <Tag
+                            color="error"
+                            className="m-0 rounded-lg px-2 py-0.5 text-[10px] font-bold"
+                          >
+                            {dishShortages} Shortage
                           </Tag>
                         ) : (
                           <Tag
                             color="success"
-                            className="rounded-md text-[10px] font-bold"
+                            className="m-0 rounded-lg px-2 py-0.5 text-[10px] font-bold"
                           >
-                            In Stock
+                            Ready in Stock ✓
                           </Tag>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+
+                    {/* Raw Materials Table for this Dish */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-100/60 text-[10px] font-extrabold uppercase text-slate-500">
+                            <th className="px-3.5 py-2">Raw Material</th>
+                            <th className="px-3.5 py-2">Per Portion</th>
+                            <th className="px-3.5 py-2">Total Required</th>
+                            <th className="px-3.5 py-2">Warehouse Stock</th>
+                            <th className="px-3.5 py-2 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {dish.rawMaterialDetails?.map((mat, mIdx) => (
+                            <tr key={mIdx} className="hover:bg-slate-50/70">
+                              <td className="px-3.5 py-2.5 font-bold text-[#092968]">
+                                {mat.materialName}
+                                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
+                                  {mat.category || 'GENERAL'}
+                                </span>
+                              </td>
+                              <td className="px-3.5 py-2.5 font-mono text-slate-500">
+                                {mat.qtyPerPerson} {mat.unitOfMeasure}
+                              </td>
+                              <td className="px-3.5 py-2.5 font-mono font-black text-[#F26E22]">
+                                {mat.totalRequiredQty} {mat.unitOfMeasure}
+                              </td>
+                              <td className="px-3.5 py-2.5 font-mono text-slate-700">
+                                {mat.quantityOnHand} {mat.unitOfMeasure}
+                              </td>
+                              <td className="px-3.5 py-2.5 text-right">
+                                {mat.isShortage ? (
+                                  <Tag
+                                    color="error"
+                                    className="m-0 rounded-md text-[10px] font-bold"
+                                  >
+                                    Shortage ({mat.shortageQty} {mat.unitOfMeasure})
+                                  </Tag>
+                                ) : (
+                                  <Tag
+                                    color="success"
+                                    className="m-0 rounded-md text-[10px] font-bold"
+                                  >
+                                    {mat.status || 'In Stock'}
+                                  </Tag>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
+        ) : (
+          currentBOMBreakdown && (
+            <div id="bom-calculation-modal-content" className="space-y-4 py-3">
+              {/* Summary Bar */}
+              <div className="grid grid-cols-3 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">
+                    Target Portions
+                  </p>
+                  <p className="font-mono text-xl font-black text-[#092968]">
+                    {currentBOMBreakdown.portions} Pax
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">
+                    Raw Materials Needed
+                  </p>
+                  <p className="font-mono text-xl font-black text-[#F26E22]">
+                    {currentBOMBreakdown.totalRawMaterialsCount} Items
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">
+                    Inventory Shortages
+                  </p>
+                  <p className="font-mono text-xl font-black text-emerald-600">
+                    {currentBOMBreakdown.shortageMaterialsCount === 0
+                      ? 'All In Stock ✓'
+                      : `${currentBOMBreakdown.shortageMaterialsCount} Shortage!`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Materials Table */}
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-[11px] font-extrabold uppercase text-slate-600">
+                      <th className="px-3 py-2.5">Raw Material</th>
+                      <th className="px-3 py-2.5">Per Portion</th>
+                      <th className="px-3 py-2.5">Total Required</th>
+                      <th className="px-3 py-2.5">Warehouse Stock</th>
+                      <th className="px-3 py-2.5 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {currentBOMBreakdown.materials.map((mat, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-3 py-2.5 font-bold text-[#092968]">
+                          {mat.materialName}
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-slate-500">
+                          {mat.qtyPerPerson} {mat.unitOfMeasure}
+                        </td>
+                        <td className="px-3 py-2.5 font-mono font-black text-[#F26E22]">
+                          {mat.totalRequiredQty} {mat.unitOfMeasure}
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700">
+                          {mat.quantityOnHand} {mat.unitOfMeasure}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          {mat.isShortage ? (
+                            <Tag
+                              color="error"
+                              className="rounded-md text-[10px] font-bold"
+                            >
+                              Shortage ({mat.shortageQty} {mat.unitOfMeasure})
+                            </Tag>
+                          ) : (
+                            <Tag
+                              color="success"
+                              className="rounded-md text-[10px] font-bold"
+                            >
+                              In Stock
+                            </Tag>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
         )}
       </Modal>
 
@@ -2852,18 +3285,3 @@ const ChefOperationsDesk: React.FC = () => {
 };
 
 export default ChefOperationsDesk;
-
-// {
-// orderId: "46ef6395-bc5a-47e2-a3b8-465cbb6d5bc5",
-// orderDetails: [
-//                 {
-                    
-//                     "itemId": "1d9fc849-232d-4e30-b1c5-8d99d119e496",
-//                     "orderedQty": 2
-//                 },
-//                 {
-                    
-//                     "itemId": "a6583917-d26d-4297-bbf3-d606347401f4",
-//                     "orderedQty": 2
-//                 }
-//               ]}
