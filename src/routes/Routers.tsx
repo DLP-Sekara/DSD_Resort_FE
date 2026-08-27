@@ -8,6 +8,7 @@ import Rooms from '../pages/rooms/Rooms';
 import MealManagement from '../pages/mealManagement/MealManagement';
 import RestaurantOrders from '../pages/restaurantOrders/RestaurantOrders';
 import KitchenManagement from '../pages/kitchen/KitchenManagement';
+import ChefOperationsDesk from '../pages/kitchen/ChefOperationsDesk';
 import BillingReport from '../pages/billingReport/BillingReport';
 import Users from '../pages/users/Users';
 import Settings from '../pages/settings/Settings';
@@ -33,6 +34,7 @@ const Routers = () => {
           <Route path="meal-management" element={<MealManagement />} />
           <Route path="restaurant-orders" element={<RestaurantOrders />} />
           <Route path="kitchen-management" element={<KitchenManagement />} />
+          <Route path="chef-desk" element={<ChefOperationsDesk />} />
           <Route path="billing-report" element={<BillingReport />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />

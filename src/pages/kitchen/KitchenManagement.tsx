@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   Tag,
@@ -29,6 +30,7 @@ import {
   ChefHat,
   Eye,
   FileSpreadsheet,
+  Flame,
 } from 'lucide-react';
 import ActionDialog from '../../components/common/ActionDialog';
 import CustomButton from '../../components/common/CustomButton';
@@ -49,6 +51,7 @@ import { errorToast } from '../../components/common/Alert';
 const { Option } = Select;
 
 const KitchenManagement = () => {
+  const navigate = useNavigate();
   const { userData } = useAuth();
   const [activeTab, setActiveTab] = useState<
     'RAW_MATERIALS' | 'FOOD_ITEMS' | 'BOM_MANAGEMENT'
@@ -535,7 +538,6 @@ const KitchenManagement = () => {
   ];
 
   // Watchers for BOM dynamic drawer
-  const watchedBOMItemId = Form.useWatch('itemId', bomForm);
   const watchedBOMItems = Form.useWatch('items', bomForm);
 
   // Filter food items to only those prepared in the kitchen
@@ -544,12 +546,6 @@ const KitchenManagement = () => {
       (f: FoodItem) => f.isKitchenPrepared ?? (f as any).is_kitchen_prepared ?? false,
     );
   }, [foodItemsResponse]);
-
-  const selectedWatchedFood = useMemo(() => {
-    return (foodItemsResponse?.data || []).find(
-      (f: FoodItem) => f.itemId === watchedBOMItemId || (f as any).id === watchedBOMItemId,
-    );
-  }, [foodItemsResponse, watchedBOMItemId]);
 
   // ==========================================
   // 3. BOM MANAGEMENT SECTION HANDLERS
@@ -734,42 +730,52 @@ const KitchenManagement = () => {
           </p>
         </div>
 
-        {/* Global Tab Navigator */}
-        <div className="flex items-center rounded-2xl bg-gray-100/90 p-1.5 shadow-inner">
-          <button
-            onClick={() => setActiveTab('RAW_MATERIALS')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-              activeTab === 'RAW_MATERIALS'
-                ? 'bg-[#092968] text-white shadow-md'
-                : 'text-gray-600 hover:text-[#092968]'
-            }`}
-          >
-            <Boxes size={16} />
-            <span>Raw Materials</span>
-          </button>
+        {/* Global Tab Navigator & Chef Desk Action */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center rounded-2xl bg-gray-100/90 p-1.5 shadow-inner">
+            <button
+              onClick={() => setActiveTab('RAW_MATERIALS')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                activeTab === 'RAW_MATERIALS'
+                  ? 'bg-[#092968] text-white shadow-md'
+                  : 'text-gray-600 hover:text-[#092968]'
+              }`}
+            >
+              <Boxes size={16} />
+              <span>Raw Materials</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('FOOD_ITEMS')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                activeTab === 'FOOD_ITEMS'
+                  ? 'bg-[#092968] text-white shadow-md'
+                  : 'text-gray-600 hover:text-[#092968]'
+              }`}
+            >
+              <Coffee size={16} />
+              <span>Food Items</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('BOM_MANAGEMENT')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                activeTab === 'BOM_MANAGEMENT'
+                  ? 'bg-[#092968] text-white shadow-md'
+                  : 'text-gray-600 hover:text-[#092968]'
+              }`}
+            >
+              <ChefHat size={16} />
+              <span>BOM Templates</span>
+            </button>
+          </div>
 
           <button
-            onClick={() => setActiveTab('FOOD_ITEMS')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-              activeTab === 'FOOD_ITEMS'
-                ? 'bg-[#092968] text-white shadow-md'
-                : 'text-gray-600 hover:text-[#092968]'
-            }`}
+            onClick={() => navigate('/dashboard/chef-desk')}
+            className="flex items-center gap-2 rounded-2xl bg-[#F26E22] px-4 py-2.5 text-xs font-extrabold text-white shadow-md transition-all hover:bg-[#d95a14] active:scale-95"
           >
-            <Coffee size={16} />
-            <span>Food Items</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('BOM_MANAGEMENT')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-              activeTab === 'BOM_MANAGEMENT'
-                ? 'bg-[#092968] text-white shadow-md'
-                : 'text-gray-600 hover:text-[#092968]'
-            }`}
-          >
-            <ChefHat size={16} />
-            <span>BOM Templates</span>
+            <Flame size={16} />
+            <span>Launch Chef's Desk (Tablet KDS)</span>
           </button>
         </div>
       </div>

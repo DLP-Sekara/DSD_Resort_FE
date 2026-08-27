@@ -8,7 +8,6 @@ const paymentMutation = () => {
     getBillById,
     printBill,
     downloadBill,
-    getTotalIncomeByDate,
   } = paymentService();
 
   const getCompletedReservationsQuery = () => {

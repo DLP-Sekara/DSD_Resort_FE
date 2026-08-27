@@ -6,6 +6,7 @@ import {
   Utensils,
   UtensilsCrossed,
   ChefHat,
+  Flame,
   Receipt,
   Users,
   Settings,
@@ -44,6 +45,11 @@ const MainSidebar = ({
       name: 'Kitchen Management',
       icon: <ChefHat size={20} />,
       path: '/dashboard/kitchen-management',
+    },
+    {
+      name: "Chef's Desk (KDS)",
+      icon: <Flame size={20} />,
+      path: '/dashboard/chef-desk',
     },
     {
       name: 'Billing & Reports',

@@ -7,12 +7,11 @@ import {
   Drawer,
   Space,
   Select,
-  Form,
-  Divider,
   Card,
   Popconfirm,
   Avatar,
   Dropdown,
+  Steps,
   type MenuProps,
 } from 'antd';
 import {
@@ -27,8 +26,15 @@ import {
   RotateCw,
   MoreVertical,
   Receipt,
-  Calendar,
+  Printer,
+  Download,
+  ArrowLeft,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
 import restaurantOrderMutation from '../../mutations/restaurantOrder.mutation';
 import mealMutation from '../../mutations/meal.mutation';
 import userMutation from '../../mutations/user.mutation';
@@ -39,17 +45,23 @@ import type {
   RestaurantOrderDetail,
 } from '../../types/restaurantOrder.interfaces';
 import type { FoodItem, UserAccount } from '../../types/services.interfaces';
-import { errorToast } from '../../components/common/Alert';
+import { errorToast, successToast } from '../../components/common/Alert';
+import { RestaurantBillReceipt, type BillItem } from './components/RestaurantBillReceipt';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
 
 const RestaurantOrders = () => {
   const { userData } = useAuth();
-  const [form] = Form.useForm();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<RestaurantOrder | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+
+  // Multi-step Create Order State: 0 = Select Items, 1 = Confirm Order, 2 = Success & Receipt
+  const [createStep, setCreateStep] = useState<number>(0);
+  const [selectedFoodList, setSelectedFoodList] = useState<BillItem[]>([]);
+  const [createdOrderData, setCreatedOrderData] = useState<any | null>(null);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,7 +76,7 @@ const RestaurantOrders = () => {
   } = restaurantOrderMutation();
 
   const { getAllFoodItemsMutation } = mealMutation();
-  const { getAllUsersMutation} = userMutation();
+  const { getAllUsersMutation } = userMutation();
   const { getAllSystemUsersQuery } = settingMutation();
 
   const { data: ordersResponse, isLoading: isOrdersLoading, refetch: refetchOrders } =
@@ -80,18 +92,15 @@ const RestaurantOrders = () => {
   const { mutateAsync: deleteOrder, isPending: isDeletingOrder } =
     deleteRestaurantOrderMutation();
 
-  // Selected foods in create order drawer
-  const watchedSelectedFoods = Form.useWatch('orderDetails', form);
-
-  // Live order total price calculation
+  // Live order total price calculation directly from selectedFoodList state
   const totalOrderAmount = useMemo(() => {
-    if (!watchedSelectedFoods || !Array.isArray(watchedSelectedFoods)) return 0;
-    return watchedSelectedFoods.reduce((acc: number, item: any) => {
+    if (!selectedFoodList || !Array.isArray(selectedFoodList)) return 0;
+    return selectedFoodList.reduce((acc: number, item: BillItem) => {
       const price = item?.unitPrice || 0;
       const qty = item?.orderedQty || 0;
       return acc + price * qty;
     }, 0);
-  }, [watchedSelectedFoods]);
+  }, [selectedFoodList]);
 
   // Filtered orders list
   const ordersList: RestaurantOrder[] = useMemo(() => {
@@ -149,28 +158,98 @@ const RestaurantOrders = () => {
     return matched?.userId || (userData as any)?.userId || staffResponse.data[0]?.userId || '';
   }, [staffResponse, userData]);
 
+  // Selected Staff User Object for Receipt
+  const currentSelectedStaff = useMemo(() => {
+    const sId = currentHandledByUserId;
+    if (!sId || !staffResponse?.data) return null;
+    return staffResponse.data.find(
+      (u: any) => u.adminId === sId || u.userId === sId,
+    );
+  }, [currentHandledByUserId, staffResponse]);
+
   // Open Create Drawer
   const openCreateDrawer = () => {
-    form.resetFields();
-    form.setFieldsValue({
-      status: 'PENDING',
-      handledBy: currentHandledByUserId,
-      orderDetails: [],
-    });
+    setSelectedFoodList([]);
+    setCreateStep(0);
+    setCreatedOrderData(null);
     setIsDrawerOpen(true);
   };
 
-  // Handle Create Order Submit
-  const handleCreateOrder = async (values: any) => {
-    if (!values.orderDetails || values.orderDetails.length === 0) {
+  // Add Item to Food List
+  const handleAddFoodItem = (itemId: string) => {
+    const selectedItem = foodItemsResponse?.data?.find(
+      (f: FoodItem) => f.itemId === itemId || (f as any).id === itemId,
+    );
+    if (!selectedItem) return;
+
+    const exists = selectedFoodList.some((f) => f.itemId === selectedItem.itemId);
+    if (exists) {
+      errorToast('Food item already added! Adjust quantity in the list below.');
+      return;
+    }
+
+    setSelectedFoodList((prev) => [
+      ...prev,
+      {
+        itemId: selectedItem.itemId,
+        name: selectedItem.name,
+        unitPrice: Number(selectedItem.unitPrice) || 0,
+        orderedQty: 1,
+        subtotal: Number(selectedItem.unitPrice) || 0,
+      },
+    ]);
+  };
+
+  // Update Item Quantity
+  const handleQuantityChange = (itemId: string, newQty: number) => {
+    const qty = Math.max(1, Number(newQty) || 1);
+    setSelectedFoodList((prev) =>
+      prev.map((item) =>
+        item.itemId === itemId
+          ? {
+              ...item,
+              orderedQty: qty,
+              subtotal: item.unitPrice * qty,
+            }
+          : item,
+      ),
+    );
+  };
+
+  // Remove Item from Food List
+  const handleRemoveFoodItem = (itemId: string) => {
+    setSelectedFoodList((prev) => prev.filter((item) => item.itemId !== itemId));
+  };
+
+  // Move from Step 0 -> Step 1 (Validate & Review)
+  const handleProceedToReview = () => {
+    if (!selectedFoodList || selectedFoodList.length === 0) {
+      errorToast('Please add at least one food item to the order before proceeding!');
+      return;
+    }
+
+    const invalidQty = selectedFoodList.some(
+      (item) => !item.orderedQty || Number(item.orderedQty) < 1,
+    );
+    if (invalidQty) {
+      errorToast('Please specify a valid quantity (minimum 1) for all food items.');
+      return;
+    }
+
+    setCreateStep(1);
+  };
+
+  // Handle Create Order Submit (Step 1 -> Step 2)
+  const handleConfirmAndPlaceOrder = async () => {
+    if (!selectedFoodList || selectedFoodList.length === 0) {
       errorToast('Please add at least one food item to the order!');
       return;
     }
 
     const payload = {
-      handledBy: values.handledBy || currentHandledByUserId || (userData as any)?.userId || '',
+      handledBy: currentHandledByUserId || (userData as any)?.userId || '',
       status: 'PENDING',
-      orderDetails: values.orderDetails.map((item: any) => ({
+      orderDetails: selectedFoodList.map((item) => ({
         itemId: item.itemId,
         orderedQty: Number(item.orderedQty),
       })),
@@ -178,8 +257,24 @@ const RestaurantOrders = () => {
 
     const res = await createOrder(payload as any);
     if (res?.success) {
-      setIsDrawerOpen(false);
-      form.resetFields();
+      const orderObj = res.data || {
+        orderId: `ORD-${Date.now().toString().slice(-6)}`,
+        orderTime: new Date().toISOString(),
+        status: 'PENDING',
+        totalAmount: totalOrderAmount,
+        guest: {
+          name: 'Walk-in Guest',
+        },
+        handledByUser: {
+          name: currentSelectedStaff?.name || userData?.name || 'Staff Member',
+          role: currentSelectedStaff?.role || (userData as any)?.role || 'Staff',
+        },
+        orderDetails: selectedFoodList,
+      };
+
+      setCreatedOrderData(orderObj);
+      setCreateStep(2);
+      refetchOrders();
     }
   };
 
@@ -191,6 +286,101 @@ const RestaurantOrders = () => {
   // Handle Delete Order
   const handleDeleteOrder = async (orderId: string) => {
     await deleteOrder(orderId);
+  };
+
+  // Print Bill Helper (Opens clean print document for thermal/A4 receipt)
+  const handlePrintBill = (elementId: string) => {
+    const content = document.getElementById(elementId);
+    if (!content) {
+      window.print();
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Restaurant Bill Receipt</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @media print {
+              @page {
+                size: 80mm auto;
+                margin: 4mm;
+              }
+              body {
+                margin: 0;
+                padding: 10px;
+                background: #ffffff !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                color: #000000;
+              }
+              .receipt-container {
+                box-shadow: none !important;
+                border: 1px solid #e5e7eb !important;
+                padding: 12px !important;
+              }
+            }
+          </style>
+        </head>
+        <body class="p-6 bg-white flex justify-center">
+          <div style="max-width: 480px; width: 100%;">
+            ${content.outerHTML}
+          </div>
+          <script>
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // Download Bill PDF Helper using html2canvas and jsPDF
+  const handleDownloadBillPDF = async (elementId: string, filename: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) {
+      errorToast('Bill element not found for PDF export.');
+      return;
+    }
+
+    setIsDownloadingPDF(true);
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2.5,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a5',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(filename);
+      successToast('Bill receipt PDF downloaded successfully!');
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      errorToast('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsDownloadingPDF(false);
+    }
   };
 
   // Helper status badge styling
@@ -584,7 +774,7 @@ const RestaurantOrders = () => {
         />
       </div>
 
-      {/* --- CREATE NEW RESTAURANT ORDER DRAWER --- */}
+      {/* --- MULTI-STEP CREATE RESTAURANT ORDER DRAWER --- */}
       <Drawer
         title={
           <div className="flex items-center gap-3">
@@ -593,206 +783,376 @@ const RestaurantOrders = () => {
             </div>
             <div>
               <h3 className="font-spaceGrotesk text-lg font-bold text-[#092968]">
-                Create Restaurant Order
+                {createStep === 0 && 'Select Food Items'}
+                {createStep === 1 && 'Confirm Order & Bill Preview'}
+                {createStep === 2 && 'Order Placed & Bill Receipt'}
               </h3>
               <p className="text-xs text-gray-400">
-                Select guest, staff handler, and food items
+                {createStep === 0 && 'Step 1 of 2: Search menu and add food items'}
+                {createStep === 1 && 'Step 2 of 2: Review details before confirming order'}
+                {createStep === 2 && 'Order placed: Print or Download Bill'}
               </p>
             </div>
           </div>
         }
-        width={560}
+        width={600}
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         className="custom-scrollbar rounded-l-[2.5rem]"
         footer={
-          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/70 p-5">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                Total Order Bill
-              </p>
-              <p className="text-xl font-black text-[#092968]">
-                LKR {totalOrderAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
+          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/80 p-5">
+            {createStep === 0 && (
+              <>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Estimated Bill
+                  </p>
+                  <p className="text-xl font-black text-[#092968]">
+                    LKR {totalOrderAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
 
-            <div className="flex gap-3">
-              <Button
-                size="large"
-                className="h-11 rounded-xl font-semibold"
-                onClick={() => setIsDrawerOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="primary"
-                size="large"
-                loading={isCreatingOrder}
-                onClick={() => form.submit()}
-                className="h-11 rounded-xl !border-none !bg-[#F26E22] font-bold text-white shadow-md transition-all hover:!bg-[#D95C1A]"
-              >
-                Submit Order
-              </Button>
-            </div>
+                <div className="flex gap-3">
+                  <Button
+                    size="large"
+                    className="h-11 rounded-xl font-semibold"
+                    onClick={() => setIsDrawerOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<ArrowRight size={16} />}
+                    onClick={handleProceedToReview}
+                    className="h-11 rounded-xl !border-none !bg-[#092968] font-bold text-white shadow-md transition-all hover:!bg-[#153e96]"
+                  >
+                    Proceed to Review
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {createStep === 1 && (
+              <>
+                <Button
+                  size="large"
+                  icon={<ArrowLeft size={16} />}
+                  className="h-11 rounded-xl font-semibold"
+                  onClick={() => setCreateStep(0)}
+                  disabled={isCreatingOrder}
+                >
+                  Back to Edit
+                </Button>
+
+                <div className="flex items-center gap-3">
+                  <div className="text-right mr-2 hidden sm:block">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Total Bill
+                    </p>
+                    <p className="text-base font-black text-[#092968]">
+                      LKR {totalOrderAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<CheckCircle2 size={18} />}
+                    loading={isCreatingOrder}
+                    onClick={handleConfirmAndPlaceOrder}
+                    className="h-11 rounded-xl !border-none !bg-[#F26E22] font-bold text-white shadow-md transition-all hover:!bg-[#D95C1A]"
+                  >
+                    Confirm & Place Order
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {createStep === 2 && (
+              <div className="w-full flex items-center justify-between">
+                <Button
+                  size="large"
+                  className="h-11 rounded-xl font-semibold"
+                  onClick={() => openCreateDrawer()}
+                >
+                  Create Another Order
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<CheckCircle2 size={16} />}
+                    onClick={() => setIsDrawerOpen(false)}
+                    className="h-11 rounded-xl !border-none !bg-[#092968] font-bold text-white shadow-md hover:!bg-[#153e96]"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         }
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleCreateOrder}
-          requiredMark={false}
-          className="space-y-4"
-        >
-          {/* Hidden handledBy and initial status */}
-          <Form.Item name="handledBy" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item name="status" hidden initialValue="PENDING">
-            <Input />
-          </Form.Item>
+        {/* Step Indicator Header */}
+        <div className="mb-6 rounded-2xl bg-gray-50/80 p-4 border border-gray-100">
+          <Steps
+            size="small"
+            current={createStep}
+            items={[
+              { title: 'Select Food Items' },
+              { title: 'Confirm Order' },
+              { title: 'Bill Receipt' },
+            ]}
+          />
+        </div>
 
-          {/* Food Items Selection */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h4 className="text-base font-bold text-[#092968]">
-                  Select Food Items
-                </h4>
-                <p className="text-xs text-gray-400">
-                  Search menu items and specify ordered quantity
-                </p>
+        {/* STEP 0: SELECT FOOD ITEMS ONLY */}
+        {createStep === 0 && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-[#092968] flex items-center gap-1.5">
+                    <UtensilsCrossed size={16} className="text-[#F26E22]" /> Select Food Items
+                  </h4>
+                  <p className="text-xs text-gray-400">
+                    Search menu items and specify ordered quantity
+                  </p>
+                </div>
+                <Tag color="orange" className="rounded-lg px-2.5 py-0.5 text-xs font-bold">
+                  {selectedFoodList.length} item(s) selected
+                </Tag>
               </div>
-              <Tag color="orange" className="rounded-lg px-2.5 py-0.5 text-xs font-bold">
-                {watchedSelectedFoods?.length || 0} item(s) selected
-              </Tag>
+
+              {/* Food item search dropdown */}
+              <Select
+                showSearch
+                placeholder="Search & Add Food Item to order..."
+                className="mb-4 h-11 w-full rounded-xl"
+                optionFilterProp="children"
+                value={null}
+                loading={isFoodLoading}
+                onChange={(value:string) => handleAddFoodItem(value)}
+              >
+                {foodItemsResponse?.data?.map((item: FoodItem) => (
+                  <Option key={item.itemId} value={item.itemId}>
+                    {item.name} — LKR {Number(item.unitPrice).toLocaleString()} (Stock: {item.quantityOnHand})
+                  </Option>
+                ))}
+              </Select>
+
+              {/* Selected Food Items List */}
+              <div className="space-y-3">
+                {selectedFoodList.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 p-8 text-center text-gray-400">
+                    <UtensilsCrossed size={28} className="mx-auto mb-2 text-gray-300" />
+                    <p className="text-xs font-semibold">No food items added yet.</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Use the search dropdown above to select items.</p>
+                  </div>
+                ) : (
+                  selectedFoodList.map((item) => {
+                    const subtotal = item.unitPrice * (item.orderedQty || 1);
+
+                    return (
+                      <div
+                        key={item.itemId}
+                        className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/70 p-3 hover:border-gray-200 transition-all"
+                      >
+                        <div className="flex-1 pr-2">
+                          <p className="text-xs font-bold text-[#0B1B3D]">{item.name}</p>
+                          <p className="text-[11px] text-gray-400">
+                            LKR {Number(item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {/* Quantity Input */}
+                          <Input
+                            type="number"
+                            min={1}
+                            value={item.orderedQty}
+                            onChange={(e) => handleQuantityChange(item.itemId, Number(e.target.value))}
+                            className="h-8 w-16 rounded-lg text-center font-bold"
+                          />
+
+                          {/* Subtotal */}
+                          <span className="w-24 text-right text-xs font-bold text-[#092968]">
+                            LKR {subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </span>
+
+                          {/* Remove button */}
+                          <Button
+                            type="text"
+                            danger
+                            icon={<Trash2 size={15} />}
+                            onClick={() => handleRemoveFoodItem(item.itemId)}
+                            className="hover:!bg-red-50"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 1: CONFIRM ORDER & BILL PREVIEW */}
+        {createStep === 1 && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between rounded-2xl bg-orange-50/80 border border-orange-100 p-4">
+              <div className="flex items-center gap-2.5">
+                <Sparkles size={18} className="text-[#F26E22]" />
+                <div>
+                  <h4 className="text-xs font-bold text-[#092968] uppercase tracking-wider">
+                    Please Review Order Details
+                  </h4>
+                  <p className="text-[11px] text-gray-500">
+                    Verify all items and bill amount before placing the order
+                  </p>
+                </div>
+              </div>
+              <Tag color="orange" className="font-bold text-xs">Step 2: Review</Tag>
             </div>
 
-            {/* Food item search dropdown */}
-            <Select
-              showSearch
-              placeholder="Search & Add Food Item to order..."
-              className="mb-4 h-11 w-full rounded-xl"
-              optionFilterProp="children"
-              value={null}
-              loading={isFoodLoading}
-              onChange={(value) => {
-                const selectedItem = foodItemsResponse?.data?.find(
-                  (f: FoodItem) => f.itemId === value || (f as any).id === value,
-                );
-                if (selectedItem) {
-                  const currentList = form.getFieldValue('orderDetails') || [];
-                  const exists = currentList.some((f: any) => f.itemId === selectedItem.itemId);
-                  if (exists) {
-                    errorToast('Food item already added! Adjust quantity below.');
-                    return;
-                  }
-                  form.setFieldsValue({
-                    orderDetails: [
-                      ...currentList,
-                      {
-                        itemId: selectedItem.itemId,
-                        name: selectedItem.name,
-                        unitPrice: selectedItem.unitPrice,
-                        orderedQty: 1,
-                      },
-                    ],
-                  });
-                }
-              }}
-            >
-              {foodItemsResponse?.data?.map((item: FoodItem) => (
-                <Option key={item.itemId} value={item.itemId}>
-                  {item.name} — LKR {Number(item.unitPrice).toLocaleString()} (Stock: {item.quantityOnHand})
-                </Option>
-              ))}
-            </Select>
-
-            {/* Selected Food Items List */}
-            <Form.List name="orderDetails">
-              {(fields, { remove }) => (
-                <div className="space-y-3">
-                  {fields.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-400">
-                      <p className="text-xs">No food items added yet. Search above to add items.</p>
-                    </div>
-                  ) : (
-                    fields.map(({ key, name, ...restField }) => {
-                      const itemData = form.getFieldValue(['orderDetails', name]);
-                      const unitPrice = itemData?.unitPrice || 0;
-                      const qty = itemData?.orderedQty || 1;
-                      const subtotal = unitPrice * qty;
-
-                      return (
-                        <div
-                          key={key}
-                          className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/70 p-3"
-                        >
-                          <div className="flex-1">
-                            <p className="text-xs font-bold text-[#0B1B3D]">{itemData?.name}</p>
-                            <p className="text-[11px] text-gray-400">
-                              LKR {Number(unitPrice).toLocaleString()} each
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            {/* Quantity Input */}
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'orderedQty']}
-                              noStyle
-                              initialValue={1}
-                            >
-                              <Input
-                                type="number"
-                                min={1}
-                                className="h-8 w-16 rounded-lg text-center font-bold"
-                              />
-                            </Form.Item>
-
-                            {/* Subtotal */}
-                            <span className="w-24 text-right text-xs font-bold text-[#092968]">
-                              LKR {subtotal.toLocaleString()}
-                            </span>
-
-                            {/* Remove button */}
-                            <Button
-                              type="text"
-                              danger
-                              icon={<Trash2 size={15} />}
-                              onClick={() => remove(name)}
-                              className="hover:!bg-red-50"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </Form.List>
+            {/* Bill Preview Card */}
+            <RestaurantBillReceipt
+              id="create-order-bill-preview"
+              isConfirmationPreview={true}
+              guestName="Walk-in Guest"
+              handledByName={currentSelectedStaff?.name || userData?.name || 'Staff Member'}
+              handledByRole={currentSelectedStaff?.role || (userData as any)?.role || 'Staff'}
+              items={selectedFoodList}
+              totalAmount={totalOrderAmount}
+            />
           </div>
-        </Form>
+        )}
+
+        {/* STEP 2: ORDER PLACED & BILL PRINT/DOWNLOAD */}
+        {createStep === 2 && createdOrderData && (
+          <div className="space-y-5">
+            {/* Success Banner */}
+            <div className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 p-5 text-white shadow-md flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur-sm">
+                  <CheckCircle2 size={28} />
+                </div>
+                <div>
+                  <h3 className="font-spaceGrotesk text-lg font-black text-white">
+                    Order Placed Successfully!
+                  </h3>
+                  <p className="text-xs text-emerald-100">
+                    Order #{String(createdOrderData.orderId || (createdOrderData as any).order_id || '').slice(-6).toUpperCase()} is registered
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons for Print & Download */}
+              <div className="flex items-center gap-2">
+                <Button
+                  icon={<Printer size={15} />}
+                  onClick={() => handlePrintBill('created-order-bill-receipt')}
+                  className="h-10 rounded-xl bg-white text-emerald-800 font-bold border-none shadow-sm hover:bg-emerald-50"
+                >
+                  Print Bill
+                </Button>
+
+                <Button
+                  icon={<Download size={15} />}
+                  loading={isDownloadingPDF}
+                  onClick={() => {
+                    const orderIdStr = String(createdOrderData.orderId || (createdOrderData as any).order_id || 'new').slice(-6).toUpperCase();
+                    handleDownloadBillPDF('created-order-bill-receipt', `Restaurant_Bill_${orderIdStr}.pdf`);
+                  }}
+                  className="h-10 rounded-xl bg-emerald-950 text-white font-bold border-none shadow-sm hover:bg-emerald-900"
+                >
+                  Download PDF
+                </Button>
+              </div>
+            </div>
+
+            {/* Generated Bill Receipt */}
+            <RestaurantBillReceipt
+              id="created-order-bill-receipt"
+              orderId={createdOrderData.orderId || (createdOrderData as any).order_id}
+              orderTime={createdOrderData.orderTime || (createdOrderData as any).order_time || new Date().toISOString()}
+              status={createdOrderData.status || 'PENDING'}
+              guestName={
+                createdOrderData.guest?.name ||
+                createdOrderData.guestName ||
+                'Walk-in Guest'
+              }
+              handledByName={
+                createdOrderData.handledByUser?.name ||
+                currentSelectedStaff?.name ||
+                userData?.name ||
+                'Staff Member'
+              }
+              handledByRole={
+                createdOrderData.handledByUser?.role ||
+                currentSelectedStaff?.role ||
+                (userData as any)?.role ||
+                'Staff'
+              }
+              items={selectedFoodList}
+              totalAmount={
+                createdOrderData.totalAmount ||
+                (createdOrderData as any).total_amount ||
+                totalOrderAmount
+              }
+            />
+          </div>
+        )}
       </Drawer>
 
       {/* --- VIEW ORDER DETAILS DRAWER / MODAL --- */}
       <Drawer
         title={
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#092968]">
-              <Receipt size={20} />
+          <div className="flex items-center justify-between w-full pr-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#092968]">
+                <Receipt size={20} />
+              </div>
+              <div>
+                <h3 className="font-spaceGrotesk text-lg font-bold text-[#092968]">
+                  Order Details & Bill
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Order #{String(selectedOrder?.orderId || (selectedOrder as any)?.order_id || '').slice(-6).toUpperCase()}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-spaceGrotesk text-lg font-bold text-[#092968]">
-                Order Details & Bill
-              </h3>
-              <p className="text-xs text-gray-400">
-                Order #{String(selectedOrder?.orderId || (selectedOrder as any)?.order_id || '').slice(-6).toUpperCase()}
-              </p>
-            </div>
+
+            {selectedOrder && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="small"
+                  icon={<Printer size={14} />}
+                  onClick={() => handlePrintBill('view-order-bill-receipt')}
+                  className="rounded-lg font-semibold text-gray-700 hover:border-[#092968]"
+                >
+                  Print
+                </Button>
+                <Button
+                  size="small"
+                  icon={<Download size={14} />}
+                  loading={isDownloadingPDF}
+                  onClick={() => {
+                    const orderIdStr = String(selectedOrder.orderId || (selectedOrder as any).order_id || 'order').slice(-6).toUpperCase();
+                    handleDownloadBillPDF('view-order-bill-receipt', `Restaurant_Bill_${orderIdStr}.pdf`);
+                  }}
+                  className="rounded-lg font-semibold text-[#092968] border-blue-200 hover:bg-blue-50"
+                >
+                  PDF
+                </Button>
+              </div>
+            )}
           </div>
         }
-        width={500}
+        width={560}
         open={isViewModalOpen}
         onClose={() => {
           setIsViewModalOpen(false);
@@ -855,107 +1215,60 @@ const RestaurantOrders = () => {
         }
       >
         {selectedOrder && (
-          <div className="space-y-5">
-            {/* Header Status & Total */}
-            <div className="rounded-2xl bg-gradient-to-br from-[#092968] to-[#0F2942] p-5 text-white shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-widest text-orange-300">
-                  Total Bill
-                </span>
-                {renderStatusTag(selectedOrder.status)}
-              </div>
-              <h2 className="mt-2 text-3xl font-extrabold text-white">
-                LKR {Number(selectedOrder.totalAmount || (selectedOrder as any).total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </h2>
-              <div className="mt-3 flex items-center gap-2 text-xs text-blue-200">
-                <Calendar size={14} />
-                <span>
-                  {dayjs(selectedOrder.orderTime || (selectedOrder as any).order_time).format('dddd, DD MMMM YYYY — hh:mm A')}
-                </span>
-              </div>
-            </div>
-
-            {/* Guest & Staff Details */}
-            <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                Customer & Staff Info
-              </h4>
-
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">Guest Name:</span>
-                <span className="font-bold text-[#0B1B3D]">
-                  {selectedOrder.guest?.name || selectedOrder.guestName || (selectedOrder as any).guest_name || 'Guest'}
-                </span>
-              </div>
-
-              {(selectedOrder.guest?.phone || (selectedOrder as any).guest?.phone) && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-500">Phone:</span>
-                  <span className="font-semibold text-gray-700">
-                    {selectedOrder.guest?.phone || (selectedOrder as any).guest?.phone}
-                  </span>
-                </div>
-              )}
-
-              {(selectedOrder.guest?.nic || (selectedOrder as any).guest?.nic) && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-500">NIC:</span>
-                  <span className="font-semibold text-gray-700">
-                    {selectedOrder.guest?.nic || (selectedOrder as any).guest?.nic}
-                  </span>
-                </div>
-              )}
-
-              <Divider className="!my-2" />
-
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">Handled By:</span>
-                <span className="font-semibold text-[#092968]">
-                  {selectedOrder.handledByUser?.name || 'Staff'} ({selectedOrder.handledByUser?.role || 'Staff'})
-                </span>
-              </div>
-            </div>
-
-            {/* Ordered Items Breakdown */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-              <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
-                Itemized Order Details
-              </h4>
-
-              <div className="space-y-2.5">
-                {(
-                  selectedOrder.orderDetails ||
-                  selectedOrder.restaurantOrderDetails ||
-                  (selectedOrder as any).order_details ||
-                  []
-                ).map((detail: RestaurantOrderDetail, idx: number) => {
-                  const foodObj = foodItemsResponse?.data?.find(
-                    (f: FoodItem) => f.itemId === detail.itemId,
-                  );
-                  const name = detail.itemName || detail.foodItem?.name || foodObj?.name || `Item #${idx + 1}`;
-                  const unitPrice = detail.unitPrice || detail.foodItem?.unitPrice || foodObj?.unitPrice || 0;
-                  const qty = detail.orderedQty || 1;
-                  const subtotal = unitPrice * qty;
-
-                  return (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs"
-                    >
-                      <div>
-                        <p className="font-bold text-[#0B1B3D]">{name}</p>
-                        <p className="text-[11px] text-gray-400">
-                          {qty} x LKR {Number(unitPrice).toLocaleString()}
-                        </p>
-                      </div>
-                      <span className="font-bold text-[#092968]">
-                        LKR {subtotal.toLocaleString()}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          <div className="space-y-4">
+            <RestaurantBillReceipt
+              id="view-order-bill-receipt"
+              orderId={selectedOrder.orderId || (selectedOrder as any).order_id}
+              orderTime={selectedOrder.orderTime || (selectedOrder as any).order_time}
+              status={selectedOrder.status}
+              guestName={
+                selectedOrder.guest?.name ||
+                selectedOrder.guestName ||
+                (selectedOrder as any).guest_name ||
+                guestsResponse?.data?.find((g: UserAccount) => g.guestId === selectedOrder.guestId)?.name ||
+                'Walk-in Guest'
+              }
+              guestPhone={
+                selectedOrder.guest?.phone ||
+                guestsResponse?.data?.find((g: UserAccount) => g.guestId === selectedOrder.guestId)?.phone
+              }
+              guestNic={
+                selectedOrder.guest?.nic ||
+                guestsResponse?.data?.find((g: UserAccount) => g.guestId === selectedOrder.guestId)?.nic
+              }
+              handledByName={
+                selectedOrder.handledByUser?.name ||
+                staffResponse?.data?.find((u: any) => u.adminId === selectedOrder.handledBy || u.userId === selectedOrder.handledBy)?.name ||
+                'Staff Member'
+              }
+              handledByRole={
+                selectedOrder.handledByUser?.role ||
+                staffResponse?.data?.find((u: any) => u.adminId === selectedOrder.handledBy || u.userId === selectedOrder.handledBy)?.role ||
+                'Staff'
+              }
+              items={(
+                selectedOrder.orderDetails ||
+                selectedOrder.restaurantOrderDetails ||
+                (selectedOrder as any).order_details ||
+                []
+              ).map((detail: RestaurantOrderDetail, idx: number) => {
+                const foodObj = foodItemsResponse?.data?.find(
+                  (f: FoodItem) => f.itemId === detail.itemId,
+                );
+                return {
+                  itemId: detail.itemId || String(idx),
+                  name: detail.itemName || detail.foodItem?.name || foodObj?.name || `Item #${idx + 1}`,
+                  unitPrice: detail.unitPrice || detail.foodItem?.unitPrice || foodObj?.unitPrice || 0,
+                  orderedQty: detail.orderedQty || 1,
+                  subtotal: (detail.unitPrice || detail.foodItem?.unitPrice || foodObj?.unitPrice || 0) * (detail.orderedQty || 1),
+                };
+              })}
+              totalAmount={
+                selectedOrder.totalAmount ||
+                (selectedOrder as any).total_amount ||
+                0
+              }
+            />
           </div>
         )}
       </Drawer>
