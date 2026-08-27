@@ -5,7 +5,6 @@ import {
   Button,
   Input,
   Select,
-  InputNumber,
   Card,
   Progress,
   Tooltip,
@@ -47,6 +46,7 @@ import html2canvas from 'html2canvas';
 import kitchenMutation from '../../mutations/kitchen.mutation';
 import mealMutation from '../../mutations/meal.mutation';
 import bomMutation from '../../mutations/bom.mutation';
+import bomUsageLogMutation from '../../mutations/bomUsageLog.mutation';
 import restaurantOrderMutation from '../../mutations/restaurantOrder.mutation';
 import { useAuth } from '../../hooks/useAuth';
 import { successToast, errorToast } from '../../components/common/Alert';
@@ -55,6 +55,8 @@ import type {
   BOMTemplate,
   CalculatedOrderBOMFoodItem,
   CalculateOrderBOMDTO,
+  BatchBOMUsageLogRequestDTO,
+  UsedBOMItemDTO,
 } from '../../types/kitchen.interfaces';
 import type { FoodItem } from '../../types/services.interfaces';
 import type {
@@ -169,102 +171,6 @@ const INITIAL_BULK_REQUIREMENTS: BulkMealRequirement[] = [
         name: 'Garlic Butter Naan & Steamed Rice',
         portionCount: 120,
         category: 'Sides',
-      },
-    ],
-  },
-];
-
-const INITIAL_PRODUCTION_LOGS: ProductionLogEntry[] = [
-  {
-    id: 'LOG-8801',
-    batchCode: 'BATCH-20260826-01',
-    date: '2026-08-26',
-    time: '06:45 AM',
-    itemId: 'F-001',
-    itemName: 'Sri Lankan String Hoppers with Kiri Hodi',
-    portionsCooked: 55,
-    loggedByChef: 'Head Chef Kumara',
-    status: 'STOCK_DEDUCTED',
-    deductedMaterials: [
-      {
-        materialId: 'RAW-01',
-        materialName: 'Rice Flour (Fine)',
-        deductedQty: 5.5,
-        unitOfMeasure: 'kg',
-      },
-      {
-        materialId: 'RAW-02',
-        materialName: 'Coconut Milk (Thick)',
-        deductedQty: 4.0,
-        unitOfMeasure: 'l',
-      },
-      {
-        materialId: 'RAW-03',
-        materialName: 'Turmeric & Curry Powder',
-        deductedQty: 0.35,
-        unitOfMeasure: 'kg',
-      },
-    ],
-  },
-  {
-    id: 'LOG-8802',
-    batchCode: 'BATCH-20260826-02',
-    date: '2026-08-26',
-    time: '11:15 AM',
-    itemId: 'F-005',
-    itemName: 'Devilled Lagoon Prawns with Fried Rice',
-    portionsCooked: 40,
-    loggedByChef: 'Sous Chef Samantha',
-    status: 'STOCK_DEDUCTED',
-    deductedMaterials: [
-      {
-        materialId: 'RAW-04',
-        materialName: 'Lagoon Fresh Jumbo Prawns',
-        deductedQty: 8.0,
-        unitOfMeasure: 'kg',
-      },
-      {
-        materialId: 'RAW-05',
-        materialName: 'Basmati Rice Premium',
-        deductedQty: 6.0,
-        unitOfMeasure: 'kg',
-      },
-      {
-        materialId: 'RAW-06',
-        materialName: 'Chili Paste & Sauces',
-        deductedQty: 1.5,
-        unitOfMeasure: 'kg',
-      },
-    ],
-  },
-  {
-    id: 'LOG-8803',
-    batchCode: 'BATCH-20260826-03',
-    date: '2026-08-26',
-    time: '01:30 PM',
-    itemId: 'F-006',
-    itemName: 'Spicy Chicken Curry with Basmati',
-    portionsCooked: 35,
-    loggedByChef: 'Chef Nimal',
-    status: 'STOCK_DEDUCTED',
-    deductedMaterials: [
-      {
-        materialId: 'RAW-07',
-        materialName: 'Fresh Chicken Breast/Thighs',
-        deductedQty: 8.75,
-        unitOfMeasure: 'kg',
-      },
-      {
-        materialId: 'RAW-05',
-        materialName: 'Basmati Rice Premium',
-        deductedQty: 5.25,
-        unitOfMeasure: 'kg',
-      },
-      {
-        materialId: 'RAW-08',
-        materialName: 'Ceylon Spices Blend',
-        deductedQty: 0.7,
-        unitOfMeasure: 'kg',
       },
     ],
   },
@@ -514,6 +420,11 @@ const ChefOperationsDesk: React.FC = () => {
   const { getAllRawMaterialsQuery } = kitchenMutation();
   const { getAllFoodItemsMutation } = mealMutation();
   const { getAllBOMTemplatesQuery, calculateOrderBOMMutation } = bomMutation();
+  const {
+    logBOMUsageMutation,
+    getAllBOMUsageLogsQuery,
+    getBOMUsageLogsByTemplateIdQuery,
+  } = bomUsageLogMutation();
   const { getAllRestaurantOrdersQuery, updateRestaurantOrderStatusMutation } =
     restaurantOrderMutation();
 
@@ -521,6 +432,38 @@ const ChefOperationsDesk: React.FC = () => {
   const { data: foodItemsRes } = getAllFoodItemsMutation();
   const { data: bomTemplatesRes } = getAllBOMTemplatesQuery();
   const { mutateAsync: calculateOrderBOMApi } = calculateOrderBOMMutation();
+  const { mutateAsync: logBOMUsageApi } = logBOMUsageMutation();
+
+  // State for Tab 2 BOM filter
+  const [selectedBOMFilter, setSelectedBOMFilter] = useState<string>('ALL');
+
+  // React Query: Fetch All BOM Usage Logs
+  const {
+    data: allBOMUsageLogsRes,
+    refetch: refetchAllBOMUsageLogs,
+    isFetching: isFetchingAllLogs,
+  } = getAllBOMUsageLogsQuery();
+
+  // React Query: Fetch BOM Usage Logs by Template ID (when template filter selected)
+  const {
+    data: templateBOMUsageLogsRes,
+    refetch: refetchTemplateLogs,
+    isFetching: isFetchingTemplateLogs,
+  } = getBOMUsageLogsByTemplateIdQuery(
+    selectedBOMFilter,
+    selectedBOMFilter !== 'ALL',
+  );
+
+  const isFetchingBOMUsageLogs = isFetchingAllLogs || isFetchingTemplateLogs;
+
+  const handleRefetchBOMUsageLogs = () => {
+    if (selectedBOMFilter === 'ALL') {
+      refetchAllBOMUsageLogs();
+    } else {
+      refetchTemplateLogs();
+    }
+  };
+
   const { data: ordersRes, refetch: refetchOrders } = getAllRestaurantOrdersQuery({
     isKitchenPrepared: true,
   });
@@ -538,13 +481,6 @@ const ChefOperationsDesk: React.FC = () => {
     () => bomTemplatesRes?.data || [],
     [bomTemplatesRes],
   );
-
-  // Kitchen prepared foods
-  const kitchenPreparedFoodItems = useMemo(() => {
-    return foodItemsList.filter(
-      (f: FoodItem) => f.isKitchenPrepared ?? (f as any).is_kitchen_prepared ?? false,
-    );
-  }, [foodItemsList]);
 
   // -------------------------------------------------------------------------
   // TAB 1: KDS ORDERS STATE & TICKERS
@@ -960,6 +896,93 @@ const ChefOperationsDesk: React.FC = () => {
     }
   };
 
+  // -------------------------------------------------------------------------
+  // CONFIRM BOM AND START COOKING (LOG BOM TO DATABASE & ADVANCE ORDER)
+  // -------------------------------------------------------------------------
+  const [isLoggingBOMAndStarting, setIsLoggingBOMAndStarting] = useState(false);
+
+  const handleConfirmBOMAndStartCooking = async () => {
+    if (!selectedBulkItem?.orderTicketId) return;
+
+    const orderId = selectedBulkItem.orderTicketId;
+    const currentChefId =
+      (userData as any)?.userId ||
+      (userData as any)?.adminId ||
+      (userData as any)?.id ||
+      'c0a80123-8bc5-47e2-a3b8-465cbb6d5bc5';
+
+    setIsLoggingBOMAndStarting(true);
+
+    try {
+      // 1. Prepare Used_BOMs array mapping each dish to its matching templateId & portions
+      let usedBoms: UsedBOMItemDTO[] = [];
+
+      if (orderBOMResults && orderBOMResults.length > 0) {
+        usedBoms = orderBOMResults.map((dish) => {
+          const targetItemId = dish.ItemId || dish.itemId;
+          const matchedTemplate = bomTemplatesList.find(
+            (b) =>
+              (targetItemId &&
+                (b.itemId === targetItemId ||
+                  (b as any).id === targetItemId ||
+                  (b as any).templateId === targetItemId)) ||
+              b.templateName.toLowerCase().includes(dish.itemName.toLowerCase()) ||
+              b.foodItem?.name?.toLowerCase().includes(dish.itemName.toLowerCase()),
+          );
+          return {
+            templateId:
+              matchedTemplate?.templateId ||
+              matchedTemplate?.id ||
+              targetItemId ||
+              '00000000-0000-0000-0000-000000000000',
+            portionsCooked: Number(dish.required_quantity) || 1,
+          };
+        });
+      } else if (selectedBulkItem.items && selectedBulkItem.items.length > 0) {
+        usedBoms = selectedBulkItem.items.map((it) => {
+          const matchedTemplate = bomTemplatesList.find(
+            (b) =>
+              (it.itemId &&
+                (b.itemId === it.itemId ||
+                  (b as any).id === it.itemId ||
+                  (b as any).templateId === it.itemId)) ||
+              b.templateName.toLowerCase().includes(it.name.toLowerCase()) ||
+              b.foodItem?.name?.toLowerCase().includes(it.name.toLowerCase()),
+          );
+          return {
+            templateId:
+              matchedTemplate?.templateId ||
+              matchedTemplate?.id ||
+              it.itemId ||
+              '00000000-0000-0000-0000-000000000000',
+            portionsCooked: Number(it.quantity) || 1,
+          };
+        });
+      }
+
+      // 2. Post BOM usage log to backend database
+      if (usedBoms.length > 0) {
+        const logPayload: BatchBOMUsageLogRequestDTO = {
+          cookedBy: currentChefId,
+          Used_BOMs: usedBoms,
+        };
+        await logBOMUsageApi(logPayload);
+      }
+
+      // 3. Advance KDS Order Status to PREPARING
+      await handleAdvanceKdsStatus(orderId, 'PREPARING');
+    } catch (err) {
+      console.error('Error during BOM usage logging:', err);
+      // Fallback advancing status if logging failed
+      await handleAdvanceKdsStatus(orderId, 'PREPARING');
+    } finally {
+      setIsLoggingBOMAndStarting(false);
+      setBomModalOpen(false);
+      setSelectedBulkItem(null);
+      setOrderBOMResults([]);
+    }
+  };
+
   const calculateBOMBreakdown = (
     dishName: string,
     portions: number,
@@ -1218,102 +1241,199 @@ const ChefOperationsDesk: React.FC = () => {
   }, [selectedBulkItem, bomTemplatesList, rawMaterialsList]);
 
   // -------------------------------------------------------------------------
-  // TAB 2: BOM SUMMARY & PRODUCTION LOG STATE
+  // TAB 2: BOM SUMMARY & USAGE LOGS STATE
   // -------------------------------------------------------------------------
-  const [productionLogs, setProductionLogs] = useState<ProductionLogEntry[]>(
-    INITIAL_PRODUCTION_LOGS,
-  );
-  const [selectedLogFoodId, setSelectedLogFoodId] = useState<string | undefined>(
-    undefined,
-  );
-  const [cookedPortions, setCookedPortions] = useState<number>(25);
-  const [isDeducting, setIsDeducting] = useState(false);
   const [logSearchTerm, setLogSearchTerm] = useState('');
   const [viewLogDetailModal, setViewLogDetailModal] = useState<ProductionLogEntry | null>(
     null,
   );
 
-  // Auto select first kitchen prepared item if available
-  useEffect(() => {
-    if (!selectedLogFoodId && kitchenPreparedFoodItems.length > 0) {
-      const firstId =
-        kitchenPreparedFoodItems[0].itemId || (kitchenPreparedFoodItems[0] as any).id;
-      setSelectedLogFoodId(firstId);
-    }
-  }, [kitchenPreparedFoodItems, selectedLogFoodId]);
+  // Normalize API production logs strictly from backend bomUsageLogMutation queries
+  const normalizedBOMUsageLogs = useMemo<ProductionLogEntry[]>(() => {
+    const rawData =
+      selectedBOMFilter !== 'ALL' && templateBOMUsageLogsRes
+        ? (templateBOMUsageLogsRes?.data ?? templateBOMUsageLogsRes)
+        : (allBOMUsageLogsRes?.data ?? allBOMUsageLogsRes);
 
-  // Compute live ingredient deduction preview for Tab 2
-  const selectedLogFoodItem = useMemo(() => {
-    return foodItemsList.find(
-      (f) => f.itemId === selectedLogFoodId || (f as any).id === selectedLogFoodId,
-    );
-  }, [foodItemsList, selectedLogFoodId]);
+    const apiLogs: any[] = Array.isArray(rawData)
+      ? rawData
+      : Array.isArray((rawData as any)?.content)
+        ? (rawData as any).content
+        : Array.isArray((rawData as any)?.data)
+          ? (rawData as any).data
+          : [];
 
-  const liveDeductionPreview = useMemo(() => {
-    if (!selectedLogFoodItem || cookedPortions <= 0) return [];
-    const breakdown = calculateBOMBreakdown(
-      selectedLogFoodItem.name,
-      cookedPortions,
-      selectedLogFoodItem.itemId,
-    );
-    return breakdown.materials;
-  }, [selectedLogFoodItem, cookedPortions, bomTemplatesList, rawMaterialsList]);
-
-  // Handle Calculate & Deduct Stock Action
-  const handleCalculateAndDeductStock = () => {
-    if (!selectedLogFoodItem) {
-      errorToast('Please select a kitchen prepared food item.');
-      return;
-    }
-    if (!cookedPortions || cookedPortions <= 0) {
-      errorToast('Please enter a valid number of portions cooked.');
-      return;
+    if (!apiLogs || apiLogs.length === 0) {
+      return [];
     }
 
-    setIsDeducting(true);
-
-    setTimeout(() => {
-      const batchCode = `BATCH-${dayjs().format('YYYYMMDD')}-${String(Math.floor(100 + Math.random() * 900))}`;
-      const chefName = userData?.name || 'Head Chef Kumara';
-
-      const newLog: ProductionLogEntry = {
-        id: `LOG-${Date.now().toString().slice(-4)}`,
-        batchCode,
-        date: dayjs().format('YYYY-MM-DD'),
-        time: dayjs().format('hh:mm A'),
-        itemId: selectedLogFoodItem.itemId || (selectedLogFoodItem as any).id || 'F-LOG',
-        itemName: selectedLogFoodItem.name,
-        portionsCooked: cookedPortions,
-        loggedByChef: chefName,
-        status: 'STOCK_DEDUCTED',
-        deductedMaterials: liveDeductionPreview.map((mat) => ({
-          materialId: mat.materialId,
-          materialName: mat.materialName,
-          deductedQty: mat.totalRequiredQty,
-          unitOfMeasure: mat.unitOfMeasure,
-        })),
-      };
-
-      setProductionLogs([newLog, ...productionLogs]);
-      setIsDeducting(false);
-      successToast(
-        `Successfully deducted stock for ${cookedPortions} portions of ${selectedLogFoodItem.name}! (Batch: ${batchCode})`,
-      );
-    }, 450);
-  };
-
-  // Filtered Production Logs
-  const filteredProductionLogs = useMemo(() => {
-    return productionLogs.filter((log) => {
-      if (!logSearchTerm) return true;
-      const term = logSearchTerm.toLowerCase();
-      return (
-        log.batchCode.toLowerCase().includes(term) ||
-        log.itemName.toLowerCase().includes(term) ||
-        log.loggedByChef.toLowerCase().includes(term)
-      );
+    const flatLogs: any[] = [];
+    apiLogs.forEach((log: any, idx: number) => {
+      // If log has nested Used_BOMs / usedBoms array
+      if (Array.isArray(log.Used_BOMs) && log.Used_BOMs.length > 0) {
+        log.Used_BOMs.forEach((bomItem: any, subIdx: number) => {
+          flatLogs.push({
+            ...log,
+            templateId: bomItem.templateId || log.templateId,
+            portionsCooked: bomItem.portionsCooked || log.portionsCooked || 1,
+            _uniqueId: `${log.id || log.usageLogId || idx}-${subIdx}`,
+          });
+        });
+      } else if (Array.isArray(log.usedBoms) && log.usedBoms.length > 0) {
+        log.usedBoms.forEach((bomItem: any, subIdx: number) => {
+          flatLogs.push({
+            ...log,
+            templateId: bomItem.templateId || log.templateId,
+            portionsCooked: bomItem.portionsCooked || log.portionsCooked || 1,
+            _uniqueId: `${log.id || log.usageLogId || idx}-${subIdx}`,
+          });
+        });
+      } else {
+        flatLogs.push({
+          ...log,
+          _uniqueId: `${log.id || log.usageLogId || idx}`,
+        });
+      }
     });
-  }, [productionLogs, logSearchTerm]);
+
+    return flatLogs.map((log: any, idx: number) => {
+      const targetTemplateId =
+        log.templateId ||
+        log.template_id ||
+        log.bomTemplateId ||
+        log.bomTemplate?.templateId ||
+        log.bomTemplate?.id ||
+        '';
+
+      const targetChefId =
+        log.cookedBy ||
+        log.cooked_by ||
+        log.userId ||
+        log.chefId ||
+        '';
+
+      // Find template
+      const template = bomTemplatesList.find(
+        (t) =>
+          (targetTemplateId &&
+            (t.templateId === targetTemplateId || (t as any).id === targetTemplateId)) ||
+          (log.itemId && (t.itemId === log.itemId || (t as any).id === log.itemId)),
+      );
+
+      const foodItem = template
+        ? foodItemsList.find(
+            (f) =>
+              f.itemId === template.itemId || (f as any).id === template.itemId,
+          )
+        : foodItemsList.find(
+            (f) => f.itemId === log.itemId || (f as any).id === log.itemId,
+          );
+
+      const itemName =
+        log.itemName ||
+        log.dishName ||
+        template?.templateName ||
+        template?.foodItem?.name ||
+        foodItem?.name ||
+        (targetTemplateId
+          ? `BOM Recipe (${targetTemplateId.slice(0, 8)})`
+          : 'Recipe Production Batch');
+
+      const portions = Number(
+        log.portionsCooked ||
+          log.portions ||
+          log.quantityCooked ||
+          log.portions_cooked ||
+          1,
+      );
+
+      const breakdown = calculateBOMBreakdown(
+        itemName,
+        portions,
+        template?.itemId || foodItem?.itemId,
+      );
+
+      const deductedMaterials =
+        log.deductedMaterials ||
+        log.materials ||
+        breakdown.materials.map((m) => ({
+          materialId: m.materialId,
+          materialName: m.materialName,
+          deductedQty: m.totalRequiredQty,
+          unitOfMeasure: m.unitOfMeasure,
+        }));
+
+      const dateStr =
+        log.createdAt || log.created_at || log.timestamp || log.date;
+      const formattedDate = dateStr
+        ? dayjs(dateStr).format('YYYY-MM-DD')
+        : dayjs().format('YYYY-MM-DD');
+      const formattedTime = dateStr
+        ? dayjs(dateStr).format('hh:mm A')
+        : dayjs().format('hh:mm A');
+
+      return {
+        id:
+          log.id ||
+          log.usageLogId ||
+          log.logId ||
+          log._uniqueId ||
+          `LOG-${idx + 1}`,
+        batchCode:
+          log.batchCode ||
+          log.batchId ||
+          (log.id
+            ? `LOG-${String(log.id).slice(-8).toUpperCase()}`
+            : `BATCH-${dayjs().format('YYYYMMDD')}-${idx + 101}`),
+        date: formattedDate,
+        time: formattedTime,
+        itemId: targetTemplateId || template?.itemId || '',
+        itemName,
+        portionsCooked: portions,
+        loggedByChef:
+          log.cookedByName ||
+          log.chefName ||
+          (targetChefId
+            ? `Chef (${targetChefId.slice(0, 8)})`
+            : userData?.name || 'Head Chef'),
+        status: 'STOCK_DEDUCTED',
+        deductedMaterials,
+      };
+    });
+  }, [
+    selectedBOMFilter,
+    templateBOMUsageLogsRes,
+    allBOMUsageLogsRes,
+    bomTemplatesList,
+    foodItemsList,
+    userData,
+  ]);
+
+  // Filtered Production Logs by BOM Template and Search Term
+  const filteredProductionLogs = useMemo(() => {
+    return normalizedBOMUsageLogs.filter((log) => {
+      // 1. Filter by BOM Template
+      if (selectedBOMFilter !== 'ALL') {
+        const matchesTemplate =
+          log.itemId === selectedBOMFilter ||
+          (log as any).templateId === selectedBOMFilter ||
+          log.itemName.toLowerCase().includes(selectedBOMFilter.toLowerCase());
+        if (!matchesTemplate) return false;
+      }
+
+      // 2. Filter by search term
+      if (logSearchTerm) {
+        const term = logSearchTerm.toLowerCase();
+        return (
+          log.batchCode.toLowerCase().includes(term) ||
+          log.itemName.toLowerCase().includes(term) ||
+          log.loggedByChef.toLowerCase().includes(term)
+        );
+      }
+
+      return true;
+    });
+  }, [normalizedBOMUsageLogs, selectedBOMFilter, logSearchTerm]);
 
   // -------------------------------------------------------------------------
   // TAB 3: AI DEMAND FORECASTING STATE
@@ -2000,216 +2120,120 @@ const ChefOperationsDesk: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/*  TAB 2: BOM SUMMARY & PRODUCTION LOG */}
+      {/*  TAB 2: BOM SUMMARY */}
       {/* ========================================================================= */}
       {activeTab === 'PRODUCTION_LOG' && (
         <div className="animate-in fade-in space-y-6 duration-300">
-          {/* Top Form: Cooked Meals Inventory Logger */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#092968] text-white">
-                  <FileSpreadsheet size={24} />
-                </div>
-                <div>
-                  <h2 className="font-spaceGrotesk text-xl font-extrabold text-[#092968]">
-                    Kitchen Production Logger & BOM Stock Deduction
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Log cooked dishes to automatically deduct raw material ingredients
-                    from warehouse inventory
-                  </p>
-                </div>
+          {/* Quick Metrics Bar */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#092968]">
+                <FileSpreadsheet size={24} />
               </div>
-              <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-[#F26E22]">
-                <ShieldCheck size={16} /> Connected with Live BOM Recipe Matrices
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Total Usage Logs
+                </p>
+                <h3 className="font-spaceGrotesk text-2xl font-black text-[#092968]">
+                  {filteredProductionLogs.length} Batches
+                </h3>
               </div>
             </div>
 
-            {/* Form Controls */}
-            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-              {/* Left Selector & Portions Input (7 cols) */}
-              <div className="space-y-5 lg:col-span-7">
-                {/* Food Item Searchable Dropdown */}
-                <div>
-                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                    Select Kitchen Prepared Food Item{' '}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <Select
-                    showSearch
-                    placeholder="Search kitchen cooked food item (e.g. Fried Rice, Curry...)"
-                    value={selectedLogFoodId}
-                    onChange={(val) => setSelectedLogFoodId(val)}
-                    optionFilterProp="children"
-                    className="h-12 w-full rounded-2xl text-sm font-semibold"
-                    size="large"
-                  >
-                    {(kitchenPreparedFoodItems.length > 0
-                      ? kitchenPreparedFoodItems
-                      : [
-                          {
-                            itemId: 'F-001',
-                            name: 'Sri Lankan String Hoppers with Kiri Hodi',
-                          },
-                          {
-                            itemId: 'F-005',
-                            name: 'Devilled Lagoon Prawns with Fried Rice',
-                          },
-                          { itemId: 'F-006', name: 'Spicy Chicken Curry with Basmati' },
-                          { itemId: 'F-008', name: 'Grilled Herb Butter Reef Fish' },
-                        ]
-                    ).map((item: any) => (
-                      <Option key={item.itemId || item.id} value={item.itemId || item.id}>
-                        {item.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-
-                {/* Portions Cooked Stepper & Quick Tap Buttons */}
-                <div>
-                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                    Number of Portions Cooked <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setCookedPortions(Math.max(1, cookedPortions - 5))}
-                      className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-lg font-black text-slate-700 hover:bg-slate-200 active:scale-95"
-                    >
-                      -5
-                    </button>
-                    <InputNumber
-                      min={1}
-                      max={1000}
-                      value={cookedPortions}
-                      onChange={(val) => setCookedPortions(Number(val) || 1)}
-                      className="h-12 flex-1 rounded-2xl text-center text-lg font-black"
-                      size="large"
-                    />
-                    <button
-                      onClick={() => setCookedPortions(cookedPortions + 5)}
-                      className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-lg font-black text-slate-700 hover:bg-slate-200 active:scale-95"
-                    >
-                      +5
-                    </button>
-                  </div>
-
-                  {/* Tablet Quick Tap Pills */}
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-400">
-                      Quick Tap:
-                    </span>
-                    {[10, 25, 50, 75, 100, 150].map((quickVal) => (
-                      <button
-                        key={quickVal}
-                        onClick={() => setCookedPortions(quickVal)}
-                        className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                          cookedPortions === quickVal
-                            ? 'bg-[#092968] text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {quickVal} Portions
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Large Tablet Touch Action Button */}
-                <button
-                  disabled={isDeducting || !selectedLogFoodItem}
-                  onClick={handleCalculateAndDeductStock}
-                  className="font-spaceGrotesk flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#F26E22] text-base font-black text-white shadow-lg transition-all hover:bg-[#d95a14] active:scale-[0.98] disabled:opacity-50"
-                >
-                  <RotateCw size={22} className={isDeducting ? 'animate-spin' : ''} />
-                  <span>
-                    {isDeducting
-                      ? 'Calculating & Deducting...'
-                      : 'Calculate & Deduct Stock from Warehouse'}
-                  </span>
-                </button>
+            <div className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-[#F26E22]">
+                <Boxes size={24} />
               </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Total Portions Cooked
+                </p>
+                <h3 className="font-spaceGrotesk text-2xl font-black text-[#F26E22]">
+                  {filteredProductionLogs.reduce((acc, curr) => acc + (curr.portionsCooked || 0), 0)} Pax
+                </h3>
+              </div>
+            </div>
 
-              {/* Right Live BOM Consumption Preview Card (5 cols) */}
-              <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5 lg:col-span-5">
-                <div>
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                      Live BOM Deduction Preview
-                    </span>
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-[#092968]">
-                      {cookedPortions} Portions
-                    </span>
-                  </div>
-
-                  <div className="mt-3 max-h-56 space-y-2.5 overflow-y-auto pr-1">
-                    {liveDeductionPreview.length === 0 ? (
-                      <p className="py-6 text-center text-xs italic text-slate-400">
-                        Select an item and enter portions to calculate raw material
-                        deductions.
-                      </p>
-                    ) : (
-                      liveDeductionPreview.map((mat, i) => (
-                        <div
-                          key={i}
-                          className="shadow-xs flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 text-xs"
-                        >
-                          <div>
-                            <p className="font-bold text-[#092968]">{mat.materialName}</p>
-                            <p className="text-[10px] text-slate-400">
-                              Rate: {mat.qtyPerPerson} {mat.unitOfMeasure} / pax
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-mono font-black text-[#F26E22]">
-                              -{mat.totalRequiredQty} {mat.unitOfMeasure}
-                            </p>
-                            <p className="text-[10px] text-slate-400">
-                              Avail: {mat.quantityOnHand} {mat.unitOfMeasure}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center gap-2 rounded-xl border border-blue-200/60 bg-blue-50 p-2.5 text-[11px] font-semibold text-[#092968]">
-                  <ShieldCheck size={16} className="shrink-0 text-[#092968]" />
-                  <span>
-                    Deduction logs generate tamper-evident batch records automatically.
-                  </span>
-                </div>
+            <div className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Active BOM Recipes
+                </p>
+                <h3 className="font-spaceGrotesk text-2xl font-black text-slate-800">
+                  {bomTemplatesList.length} Templates
+                </h3>
               </div>
             </div>
           </div>
 
-          {/* Bottom Sleek Table: Recent Production Logs */}
+          {/* BOM Usage Logs Table with Filter */}
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="font-spaceGrotesk text-lg font-bold text-[#092968]">
-                  Recent Kitchen Production Logs
+                <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
+                  BOM Production & Usage Logs
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Audit trail of meal batches cooked and corresponding inventory
-                  consumption
+                  Audit trail of meal batches cooked and raw materials deducted from warehouse
                 </p>
               </div>
 
-              <div className="relative">
-                <Search
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <Input
-                  placeholder="Filter by batch, dish, or chef..."
-                  value={logSearchTerm}
-                  onChange={(e) => setLogSearchTerm(e.target.value)}
-                  className="h-10 w-full rounded-xl border-slate-200 pl-9 text-xs sm:w-64"
-                  allowClear
-                />
+              <div className="flex flex-wrap items-center gap-3">
+                {/* BOM Template Filter Dropdown */}
+                <div className="w-full sm:w-64">
+                  <Select
+                    showSearch
+                    placeholder="Filter by BOM Template"
+                    value={selectedBOMFilter}
+                    onChange={(val) => setSelectedBOMFilter(val)}
+                    optionFilterProp="children"
+                    className="h-10 w-full rounded-xl text-xs font-semibold"
+                  >
+                    <Option value="ALL">All BOM Templates & Dishes</Option>
+                    {bomTemplatesList.map((tpl: any) => {
+                      const id = tpl.templateId || tpl.id || tpl.itemId;
+                      const name = tpl.templateName || tpl.foodItem?.name || 'Recipe';
+                      return (
+                        <Option key={id} value={id}>
+                          {name}
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </div>
+
+                {/* Text Search Input */}
+                <div className="relative w-full sm:w-56">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <Input
+                    placeholder="Search batch, dish, or chef..."
+                    value={logSearchTerm}
+                    onChange={(e) => setLogSearchTerm(e.target.value)}
+                    className="h-10 w-full rounded-xl border-slate-200 pl-9 text-xs"
+                    allowClear
+                  />
+                </div>
+
+                {/* Refresh Button */}
+                <Button
+                  icon={
+                    <RotateCw
+                      size={15}
+                      className={isFetchingBOMUsageLogs ? 'animate-spin' : ''}
+                    />
+                  }
+                  onClick={handleRefetchBOMUsageLogs}
+                  className="flex h-10 items-center justify-center rounded-xl font-bold"
+                >
+                  Refresh
+                </Button>
               </div>
             </div>
 
@@ -2219,8 +2243,8 @@ const ChefOperationsDesk: React.FC = () => {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
                     <th className="px-4 py-3.5">Date & Time</th>
-                    <th className="px-4 py-3.5">Batch ID</th>
-                    <th className="px-4 py-3.5">Cooked Dish</th>
+                    <th className="px-4 py-3.5">Batch / Log Code</th>
+                    <th className="px-4 py-3.5">Cooked Dish / Recipe</th>
                     <th className="px-4 py-3.5 text-center">Portions Cooked</th>
                     <th className="px-4 py-3.5">Logged By Chef</th>
                     <th className="px-4 py-3.5 text-center">Inventory Status</th>
@@ -2228,48 +2252,83 @@ const ChefOperationsDesk: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredProductionLogs.map((log) => (
-                    <tr key={log.id} className="transition-colors hover:bg-slate-50/80">
-                      <td className="px-4 py-3 font-semibold text-slate-700">
-                        {log.date}{' '}
-                        <span className="block text-[11px] text-slate-400">
-                          {log.time}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-[#092968]">
-                          {log.batchCode}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-extrabold text-[#092968]">
-                        {log.itemName}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="rounded-full bg-orange-100 px-3 py-1 font-mono font-black text-[#F26E22]">
-                          {log.portionsCooked} Pax
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-slate-600">
-                        {log.loggedByChef}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Tag
-                          color="success"
-                          className="rounded-lg px-2.5 py-0.5 text-xs font-bold"
-                        >
-                          ✓ Stock Deducted
-                        </Tag>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => setViewLogDetailModal(log)}
-                          className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-[#092968] transition-all hover:bg-[#092968] hover:text-white"
-                        >
-                          View BOM Details
-                        </button>
+                  {isFetchingBOMUsageLogs ? (
+                    <tr>
+                      <td colSpan={7} className="py-14 text-center">
+                        <Spin size="large" />
+                        <p className="mt-3 text-xs font-bold text-slate-500">
+                          Fetching live BOM usage records...
+                        </p>
                       </td>
                     </tr>
-                  ))}
+                  ) : filteredProductionLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <Boxes size={36} className="mx-auto mb-2 opacity-30" />
+                        <p className="font-semibold text-slate-600">No BOM usage logs found</p>
+                        <p className="text-xs text-slate-400">
+                          {selectedBOMFilter !== 'ALL' || logSearchTerm
+                            ? 'Try clearing the BOM template filter or search query.'
+                            : 'BOM usage logs will appear here once meals are prepared and approved.'}
+                        </p>
+                        {(selectedBOMFilter !== 'ALL' || logSearchTerm) && (
+                          <Button
+                            size="small"
+                            className="mt-3 rounded-lg font-bold"
+                            onClick={() => {
+                              setSelectedBOMFilter('ALL');
+                              setLogSearchTerm('');
+                            }}
+                          >
+                            Reset Filters
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredProductionLogs.map((log) => (
+                      <tr key={log.id} className="transition-colors hover:bg-slate-50/80">
+                        <td className="px-4 py-3 font-semibold text-slate-700">
+                          {log.date}{' '}
+                          <span className="block text-[11px] text-slate-400">
+                            {log.time}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-[#092968]">
+                            {log.batchCode}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-extrabold text-[#092968]">
+                          {log.itemName}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="rounded-full bg-orange-100 px-3 py-1 font-mono font-black text-[#F26E22]">
+                            {log.portionsCooked} Pax
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-600">
+                          {log.loggedByChef}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Tag
+                            color="success"
+                            className="rounded-lg px-2.5 py-0.5 text-xs font-bold"
+                          >
+                            ✓ Stock Deducted
+                          </Tag>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            onClick={() => setViewLogDetailModal(log)}
+                            className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-[#092968] transition-all hover:bg-[#092968] hover:text-white"
+                          >
+                            View BOM Details
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2460,7 +2519,7 @@ const ChefOperationsDesk: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 🍲 MODAL: ORDER DETAILS & FOOD ITEMS WITH BOM CALCULATION OPTION */}
+      {/* MODAL: ORDER DETAILS & FOOD ITEMS WITH BOM CALCULATION OPTION */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -2760,39 +2819,24 @@ const ChefOperationsDesk: React.FC = () => {
               Close
             </Button>
           ),
-          <Button
-            key="print-footer"
-            icon={<Printer size={15} />}
-            disabled={isCalculatingOrderBOM}
-            className="h-11 rounded-xl border-slate-300 px-4 font-bold text-slate-700 hover:border-[#092968] hover:text-[#092968]"
-            onClick={() => handlePrintBOMDetails('bom-calculation-modal-content')}
-          >
-            Print
-          </Button>,
-          <Button
-            key="download-pdf-footer"
-            icon={<Download size={15} />}
-            loading={isDownloadingBOMPDF}
-            disabled={isCalculatingOrderBOM}
-            className="h-11 rounded-xl border-slate-300 px-4 font-bold text-slate-700 hover:border-[#092968] hover:text-[#092968]"
-            onClick={() => handleDownloadBOMPDF('bom-calculation-modal-content')}
-          >
-            Download PDF
-          </Button>,
+         
           selectedBulkItem?.orderTicketId ? (
-            <button
+            <Button
               key="confirm-start-cooking"
-              onClick={() => {
-                handleAdvanceKdsStatus(selectedBulkItem.orderTicketId!, 'PREPARING');
-                setBomModalOpen(false);
-                setSelectedBulkItem(null);
-                setOrderBOMResults([]);
-              }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-bold text-white shadow-md hover:bg-[#d95a14] active:scale-95"
+              disabled={isLoggingBOMAndStarting}
+              onClick={handleConfirmBOMAndStartCooking}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-bold text-white shadow-md hover:bg-[#d95a14] active:scale-95 disabled:opacity-60"
             >
-              <Flame size={16} />
-              <span>Start Cooking (BOM Approved)</span>
-            </button>
+              <Flame
+                size={16}
+                className={isLoggingBOMAndStarting ? 'animate-spin' : ''}
+              />
+              <span>
+                {isLoggingBOMAndStarting
+                  ? 'Logging BOM & Starting...'
+                  : 'Start Cooking (BOM Approved)'}
+              </span>
+            </Button>
           ) : (
             <button
               key="print"

@@ -111,3 +111,14 @@ export interface CalculateOrderBOMDTO {
   }[];
 }
 
+export interface UsedBOMItemDTO {
+  templateId: string;
+  portionsCooked: number;
+}
+
+export interface BatchBOMUsageLogRequestDTO {
+  cookedBy: string;
+  Used_BOMs: UsedBOMItemDTO[];
+}
+
+
