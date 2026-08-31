@@ -128,7 +128,7 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     >
       <div className="py-2 px-1">
         {/* Step Indicator Header */}
-        <div className="mb-6">
+        <div className="my-6">
           <div className="flex items-center justify-between text-xs font-semibold text-gray-400 mb-2">
             <span className={step >= 1 ? 'text-[#F26E22]' : ''}>1. Email</span>
             <div className={`h-[2px] flex-1 mx-2 ${step >= 2 ? 'bg-[#F26E22]' : 'bg-gray-200'}`} />
@@ -149,7 +149,7 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                 Forgot Password?
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                No worries! Enter your registered email and we'll send you an OTP verification code.
+                Enter your registered email and we'll send you an OTP verification code.
               </p>
             </div>
 

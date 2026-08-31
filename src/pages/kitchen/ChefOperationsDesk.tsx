@@ -6,9 +6,12 @@ import {
   Input,
   Select,
   Card,
-  Progress,
   Tooltip,
   Spin,
+  DatePicker,
+  Drawer,
+  InputNumber,
+  Switch,
 } from 'antd';
 import {
   Flame,
@@ -18,7 +21,6 @@ import {
   RotateCw,
   Search,
   Sparkles,
-  TrendingUp,
   Utensils,
   Maximize2,
   Minimize2,
@@ -31,12 +33,19 @@ import {
   ShieldCheck,
   Boxes,
   Send,
-  CloudSun,
-  FlameKindling,
   Timer,
   Eye,
   Printer,
   Download,
+  Sun,
+  CloudRain,
+  Cloud,
+  Thermometer,
+  CalendarDays,
+  BookmarkPlus,
+  Plus,
+  Minus,
+  Trash2,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -65,7 +74,6 @@ import type {
   BulkMealRequirement,
   BOMCalculationDetail,
   ProductionLogEntry,
-  AIDemandForecastData,
   AIPredictedItem,
 } from '../../types/chefPortal.interfaces';
 
@@ -176,107 +184,144 @@ const INITIAL_BULK_REQUIREMENTS: BulkMealRequirement[] = [
   },
 ];
 
-const INITIAL_AI_FORECAST: AIDemandForecastData = {
-  forecastDate: 'Tomorrow, Aug 27',
-  predictedGuestCount: 148,
-  occupancyRate: 92,
-  occupancyTrend: 16.5,
-  weatherSummary: {
+export interface SavedDemandRecord {
+  id: string;
+  date: string;
+  weatherCondition: 'Clear' | 'Rainy' | 'Cloudy';
+  temperature: number;
+  isHoliday: string;
+  dayDetails: string;
+  demandedCount: number;
+  modelAccuracy: number;
+}
+
+const DEFAULT_MENU_ITEMS = [
+  { itemId: 'F-001', name: 'Sri Lankan String Hoppers with Kiri Hodi', category: 'Breakfast', unitPrice: 850 },
+  { itemId: 'F-002', name: 'Scrambled Farm Eggs & Sausages', category: 'Continental', unitPrice: 1200 },
+  { itemId: 'F-003', name: 'Tropical Fresh Fruit Platter', category: 'Fruits', unitPrice: 650 },
+  { itemId: 'F-004', name: 'Freshly Brewed Ceylon Milk Tea', category: 'Beverages', unitPrice: 350 },
+  { itemId: 'F-005', name: 'Devilled Lagoon Prawns with Fried Rice', category: 'Seafood', unitPrice: 2400 },
+  { itemId: 'F-006', name: 'Spicy Chicken Curry with Basmati', category: 'Main Dish', unitPrice: 1850 },
+  { itemId: 'F-007', name: 'Dhal Curry in Coconut Milk', category: 'Curry', unitPrice: 650 },
+  { itemId: 'F-008', name: 'Grilled Herb Butter Reef Fish', category: 'Grill', unitPrice: 2800 },
+  { itemId: 'F-009', name: 'Barbecue Spiced Pork Ribs & Chicken', category: 'Grill', unitPrice: 3200 },
+  { itemId: 'F-010', name: 'Garlic Butter Naan & Steamed Rice', category: 'Sides', unitPrice: 750 },
+];
+
+const INITIAL_SAVED_DEMANDS: SavedDemandRecord[] = [
+  {
+    id: 'DEM-001',
+    date: '2026-08-28',
+    weatherCondition: 'Clear',
+    temperature: 31,
+    isHoliday: 'No (Regular Day)',
+    dayDetails: 'Friday • Weekday',
+    demandedCount: 128,
+    modelAccuracy: 96.4,
+  },
+  {
+    id: 'DEM-002',
+    date: '2026-08-27',
+    weatherCondition: 'Cloudy',
+    temperature: 29,
+    isHoliday: 'No (Regular Day)',
+    dayDetails: 'Thursday • Weekday',
+    demandedCount: 114,
+    modelAccuracy: 95.8,
+  },
+  {
+    id: 'DEM-003',
+    date: '2026-08-24',
+    weatherCondition: 'Clear',
     temperature: 32,
-    condition: 'SUNNY',
-    description: 'Hot, Tropical Sunny Day with clear skies',
-    impactNote:
-      'High heat index (+32°C). AI recommends +35% cold fresh juices & seafood, -20% heavy hot soups.',
+    isHoliday: 'Yes - Poson Poya Holiday',
+    dayDetails: 'Monday • Public Holiday',
+    demandedCount: 165,
+    modelAccuracy: 98.1,
   },
-  rushHours: [
-    {
-      timeSlot: '07:30 AM - 09:30 AM',
-      mealSession: 'Breakfast Buffet Peak',
-      expectedLoad: 'EXTREME_PEAK',
-      staffRecommendation: 'Deploy 3 line cooks at Live Egg & String Hopper stations.',
-    },
-    {
-      timeSlot: '12:45 PM - 02:15 PM',
-      mealSession: 'Lunch Walk-in & Poolside',
-      expectedLoad: 'HEAVY',
-      staffRecommendation:
-        'Prep seafood marinades and chilled beverage dispensers by 11:30 AM.',
-    },
-    {
-      timeSlot: '07:45 PM - 09:45 PM',
-      mealSession: 'Dinner BBQ Banquet',
-      expectedLoad: 'EXTREME_PEAK',
-      staffRecommendation:
-        'Full grill crew active. Pre-thaw 35kg meat and 25kg lagoon prawns.',
-    },
-  ],
-  modelInfo: {
-    version: 'DSD-KitchenAI v2.4 (Transformer Ensemble)',
-    accuracyScore: 96.4,
-    lastUpdated: '10 mins ago',
+  {
+    id: 'DEM-004',
+    date: '2026-08-23',
+    weatherCondition: 'Rainy',
+    temperature: 27,
+    isHoliday: 'No (Regular Day)',
+    dayDetails: 'Sunday • Weekend',
+    demandedCount: 138,
+    modelAccuracy: 94.2,
   },
-  predictedItems: [
-    {
-      itemId: 'PRED-01',
-      itemName: 'Devilled Lagoon Prawns with Fried Rice',
-      category: 'Seafood',
-      predictedPortions: 74,
-      trendPercentage: 32,
-      confidenceScore: 97,
-      peakServingTime: '12:30 PM - 02:30 PM',
-      recommendedPrepWindow: '10:30 AM - 11:30 AM',
-      prepPriority: 'HIGH',
-      weatherFactor: 'Sunny weather drives +38% poolside seafood demand',
-    },
-    {
-      itemId: 'PRED-02',
-      itemName: 'Grilled Herb Butter Reef Fish',
-      category: 'Grill',
-      predictedPortions: 65,
-      trendPercentage: 24,
-      confidenceScore: 94,
-      peakServingTime: '07:30 PM - 09:30 PM',
-      recommendedPrepWindow: '04:00 PM - 05:30 PM',
-      prepPriority: 'HIGH',
-      weatherFactor: 'Evening terrace dining occupancy expected at 95%',
-    },
-    {
-      itemId: 'PRED-03',
-      itemName: 'Sri Lankan String Hoppers with Kiri Hodi',
-      category: 'Breakfast',
-      predictedPortions: 85,
-      trendPercentage: 18,
-      confidenceScore: 98,
-      peakServingTime: '07:30 AM - 09:00 AM',
-      recommendedPrepWindow: '05:30 AM - 06:30 AM',
-      prepPriority: 'HIGH',
-      weatherFactor: 'High local & foreign family tourist check-ins',
-    },
-    {
-      itemId: 'PRED-04',
-      itemName: 'Spicy Chicken Curry with Basmati',
-      category: 'Main Dish',
-      predictedPortions: 55,
-      trendPercentage: 8,
-      confidenceScore: 91,
-      peakServingTime: '01:00 PM - 02:30 PM',
-      recommendedPrepWindow: '11:00 AM - 12:00 PM',
-      prepPriority: 'MEDIUM',
-      weatherFactor: 'Steady baseline buffet requirement',
-    },
-    {
-      itemId: 'PRED-05',
-      itemName: 'Fresh Passion Fruit & Mint Cooler',
-      category: 'Beverages',
-      predictedPortions: 110,
-      trendPercentage: 45,
-      confidenceScore: 99,
-      peakServingTime: '11:00 AM - 04:00 PM',
-      recommendedPrepWindow: '09:00 AM - 10:00 AM',
-      prepPriority: 'HIGH',
-      weatherFactor: 'High temperature (+32°C) creates massive drink rush',
-    },
-  ],
+  {
+    id: 'DEM-005',
+    date: '2026-08-22',
+    weatherCondition: 'Clear',
+    temperature: 33,
+    isHoliday: 'No (Regular Day)',
+    dayDetails: 'Saturday • Weekend',
+    demandedCount: 152,
+    modelAccuracy: 97.0,
+  },
+];
+
+const getForecastForDate = (targetDate: dayjs.Dayjs) => {
+  const dayOfWeek = targetDate.format('dddd');
+  const isWeekend = targetDate.day() === 0 || targetDate.day() === 6;
+  const dayType = isWeekend ? 'Weekend' : 'Weekday';
+  const dayDetails = `${dayOfWeek} • ${dayType}`;
+
+  // Deterministic seed based on day + month
+  const dayOfYear = targetDate.month() * 31 + targetDate.date();
+
+  // Weather condition
+  const weatherOptions: Array<'Clear' | 'Rainy' | 'Cloudy'> = [
+    'Clear',
+    'Rainy',
+    'Cloudy',
+    'Clear',
+    'Clear',
+  ];
+  const weatherCondition = weatherOptions[Math.abs(dayOfYear) % weatherOptions.length];
+
+  // Temperature (27°C - 33°C)
+  const temperature = 28 + (Math.abs(dayOfYear * 7) % 6);
+
+  // Holiday detection
+  const month = targetDate.month() + 1; // 1-12
+  const day = targetDate.date();
+
+  let isHoliday = 'No (Regular Day)';
+  if (month === 1 && day === 1) isHoliday = 'Yes - New Year Day';
+  else if (month === 2 && day === 4) isHoliday = 'Yes - National Independence Day';
+  else if (month === 4 && (day === 13 || day === 14))
+    isHoliday = 'Yes - Sinhala & Tamil New Year';
+  else if (month === 5 && (day === 15 || day === 23))
+    isHoliday = 'Yes - Vesak Full Moon Poya';
+  else if (month === 6 && day === 21) isHoliday = 'Yes - Poson Full Moon Poya';
+  else if (month === 8 && day === 19) isHoliday = 'Yes - Nikini Full Moon Poya';
+  else if (month === 8 && day === 28) isHoliday = 'Yes - Resort Gala Banquet Day';
+  else if (month === 12 && day === 25) isHoliday = 'Yes - Christmas Day';
+  else if (day === 15 || day === 28) isHoliday = 'Yes - Public Poya Holiday';
+
+  // Base Demand calculation
+  let baseDemand = 80;
+  if (isWeekend) baseDemand += 35;
+  if (isHoliday.startsWith('Yes')) baseDemand += 42;
+  if (weatherCondition === 'Clear') baseDemand += 15;
+  else if (weatherCondition === 'Cloudy') baseDemand += 8;
+  else if (weatherCondition === 'Rainy') baseDemand -= 6;
+
+  const demandingCount = baseDemand + (Math.abs(dayOfYear * 3) % 18);
+
+  return {
+    dateStr: targetDate.format('YYYY-MM-DD'),
+    formattedDate: targetDate.format('DD MMM YYYY'),
+    weatherCondition,
+    temperature,
+    isHoliday,
+    dayDetails,
+    dayOfWeek,
+    dayType,
+    demandingCount,
+    confidenceScore: 94 + (Math.abs(dayOfYear) % 6),
+  };
 };
 
 const INITIAL_A_LA_CARTE_TICKETS: KDSOrderTicket[] = [
@@ -1436,11 +1481,242 @@ const ChefOperationsDesk: React.FC = () => {
   }, [normalizedBOMUsageLogs, selectedBOMFilter, logSearchTerm]);
 
   // -------------------------------------------------------------------------
-  // TAB 3: AI DEMAND FORECASTING STATE
+  // TAB 3: AI DEMAND FORECASTING STATE & INTERACTIVE CONTROLS
   // -------------------------------------------------------------------------
-  const [aiForecast] = useState<AIDemandForecastData>(INITIAL_AI_FORECAST);
+  const [selectedForecastDate, setSelectedForecastDate] = useState<dayjs.Dayjs>(dayjs());
+  const [savedDemandRecords, setSavedDemandRecords] = useState<SavedDemandRecord[]>(
+    INITIAL_SAVED_DEMANDS,
+  );
   const [aiBOMCheckModal, setAiBOMCheckModal] = useState<AIPredictedItem | null>(null);
   const [isRequisitionSent, setIsRequisitionSent] = useState(false);
+
+  // Manual interactive state for Weather (Clear, Rainy, Cloudy), Temperature, and Boolean Holiday
+  const [manualWeather, setManualWeather] = useState<'Clear' | 'Rainy' | 'Cloudy'>('Clear');
+  const [manualTemp, setManualTemp] = useState<number>(31);
+  const [isHoliday, setIsHoliday] = useState<boolean>(false);
+
+  // Auto sync defaults whenever selected date changes
+  useEffect(() => {
+    const def = getForecastForDate(selectedForecastDate || dayjs());
+    setManualWeather(def.weatherCondition);
+    setManualTemp(def.temperature);
+    setIsHoliday(def.isHoliday.startsWith('Yes'));
+  }, [selectedForecastDate]);
+
+  // Reactive Demand Count calculation according to date and interactive card adjustments
+  const currentDateForecast = useMemo(() => {
+    const targetDate = selectedForecastDate || dayjs();
+    const dayOfWeek = targetDate.format('dddd');
+    const isWeekend = targetDate.day() === 0 || targetDate.day() === 6;
+    const dayType = isWeekend ? 'Weekend' : 'Weekday';
+    const dayDetails = `${dayOfWeek} • ${dayType}`;
+
+    let baseDemand = 80;
+    if (isWeekend) baseDemand += 35;
+    if (isHoliday) baseDemand += 45;
+    if (manualWeather === 'Clear') baseDemand += 15;
+    else if (manualWeather === 'Cloudy') baseDemand += 5;
+    else if (manualWeather === 'Rainy') baseDemand -= 8;
+
+    if (manualTemp > 30) baseDemand += (manualTemp - 30) * 2;
+    else if (manualTemp < 26) baseDemand -= (26 - manualTemp) * 2;
+
+    const demandingCount = Math.max(25, baseDemand);
+
+    return {
+      dateStr: targetDate.format('YYYY-MM-DD'),
+      formattedDate: targetDate.format('DD MMM YYYY'),
+      weatherCondition: manualWeather,
+      temperature: manualTemp,
+      isHoliday: isHoliday ? 'Yes (Holiday)' : 'No (Regular Day)',
+      isHolidayBool: isHoliday,
+      dayDetails,
+      dayOfWeek,
+      dayType,
+      demandingCount,
+      confidenceScore: 79, // fixed model accuracy as 79
+    };
+  }, [selectedForecastDate, manualWeather, manualTemp, isHoliday]);
+
+  // Available food items list for portion allocation in sidebar
+  const availableAllocationFoodItems = useMemo(() => {
+    const items: { itemId: string; name: string; category: string; unitPrice: number }[] = [];
+    if (foodItemsList && foodItemsList.length > 0) {
+      foodItemsList.forEach((f: any) => {
+        items.push({
+          itemId: f.itemId || f.id || 'F-ITEM',
+          name: f.name || f.itemName || 'Resort Dish',
+          category: f.category || 'Main Dish',
+          unitPrice: Number(f.unitPrice) || Number(f.price) || 1200,
+        });
+      });
+    } else {
+      DEFAULT_MENU_ITEMS.forEach((f) => items.push(f));
+    }
+    return items;
+  }, [foodItemsList]);
+
+  // Drawer allocation state
+  const [isForecastBOMDrawerOpen, setIsForecastBOMDrawerOpen] = useState(false);
+  const [forecastFoodAllocations, setForecastFoodAllocations] = useState<
+    { itemId: string; name: string; category: string; unitPrice: number; portions: number; isSelected: boolean }[]
+  >([]);
+
+  // Open drawer and initialize/sync portions with current demanding count
+  const handleOpenForecastBOMDrawer = () => {
+    const totalPax = currentDateForecast.demandingCount;
+    // If no allocations yet, initialize with top 4 dishes
+    if (forecastFoodAllocations.length === 0) {
+      const topDishes = availableAllocationFoodItems.slice(0, 4);
+      const baseShare = Math.floor(totalPax / topDishes.length);
+      const remainder = totalPax % topDishes.length;
+
+      const initialItems = topDishes.map((item, idx) => ({
+        itemId: item.itemId,
+        name: item.name,
+        category: item.category,
+        unitPrice: item.unitPrice,
+        portions: baseShare + (idx < remainder ? 1 : 0),
+        isSelected: true,
+      }));
+      setForecastFoodAllocations(initialItems);
+    }
+    setIsForecastBOMDrawerOpen(true);
+  };
+
+  const allocatedPortionsSum = useMemo(() => {
+    return forecastFoodAllocations
+      .filter((it) => it.isSelected)
+      .reduce((sum, it) => sum + (Number(it.portions) || 0), 0);
+  }, [forecastFoodAllocations]);
+
+  const selectedAllocatedCount = useMemo(() => {
+    return forecastFoodAllocations.filter((it) => it.isSelected).length;
+  }, [forecastFoodAllocations]);
+
+  // Optimized auto-distribution helper across selected items
+  const handleAutoDistributeForecastPortions = () => {
+    const totalPax = currentDateForecast.demandingCount;
+
+    setForecastFoodAllocations((prev) => {
+      let itemsToDistribute = prev.filter((p) => p.isSelected);
+
+      if (itemsToDistribute.length === 0) {
+        itemsToDistribute = availableAllocationFoodItems.slice(0, 4).map((f) => ({
+          itemId: f.itemId,
+          name: f.name,
+          category: f.category,
+          unitPrice: f.unitPrice,
+          portions: 0,
+          isSelected: true,
+        }));
+      }
+
+      const numItems = itemsToDistribute.length;
+      const baseShare = Math.floor(totalPax / numItems);
+      const remainder = totalPax % numItems;
+
+      const distributedMap = new Map<string, number>();
+      itemsToDistribute.forEach((item, index) => {
+        distributedMap.set(item.itemId, baseShare + (index < remainder ? 1 : 0));
+      });
+
+      const existingIds = new Set(prev.map((p) => p.itemId));
+      const newItemsToAdd = itemsToDistribute.filter(
+        (item) => !existingIds.has(item.itemId),
+      );
+
+      const updatedExisting = prev.map((item) => {
+        if (distributedMap.has(item.itemId)) {
+          return {
+            ...item,
+            isSelected: true,
+            portions: distributedMap.get(item.itemId) || 0,
+          };
+        }
+        return item;
+      });
+
+      return [
+        ...updatedExisting,
+        ...newItemsToAdd.map((item) => ({
+          ...item,
+          portions: distributedMap.get(item.itemId) || 0,
+        })),
+      ];
+    });
+
+    successToast(`Evenly distributed exact ${totalPax} portions across dishes!`);
+  };
+
+  // Launch BOM Calculation Modal from Drawer with multi-dish separated breakdown
+  const handleCalculateAllocatedBOM = () => {
+    const selected = forecastFoodAllocations.filter(
+      (it) => it.isSelected && it.portions > 0,
+    );
+    if (selected.length === 0) {
+      errorToast('Please select at least one food item with portion count greater than 0.');
+      return;
+    }
+
+    const calculatedResults: CalculatedOrderBOMFoodItem[] = selected.map((it) => {
+      const breakdown = calculateBOMBreakdown(it.name, it.portions, it.itemId);
+      return {
+        ItemId: it.itemId,
+        itemId: it.itemId,
+        itemName: it.name,
+        required_quantity: it.portions,
+        rawMaterialDetails: breakdown.materials.map((m) => ({
+          materialId: m.materialId,
+          materialName: m.materialName,
+          category: m.category,
+          unitOfMeasure: m.unitOfMeasure,
+          qtyPerPerson: m.qtyPerPerson,
+          orderedQty: it.portions,
+          totalRequiredQty: m.totalRequiredQty,
+          quantityOnHand: m.quantityOnHand,
+          status: m.isShortage ? 'Shortage' : 'In Stock',
+          isShortage: m.isShortage,
+          shortageQty: m.shortageQty,
+        })),
+      };
+    });
+
+    setOrderBOMResults(calculatedResults);
+    setSelectedBulkItem({
+      dishName: `AI Forecast Demand Allocation`,
+      orderNumber: `FCST-${selectedForecastDate.format('MMDD')}`,
+      portionCount: allocatedPortionsSum,
+      mealSession: 'FORECAST_ALLOCATION',
+      orderTicketId: `FCST-${selectedForecastDate.format('YYYYMMDD')}`,
+      items: selected.map((it) => ({
+        itemId: it.itemId,
+        name: it.name,
+        quantity: it.portions,
+      })),
+    });
+    setIsForecastBOMDrawerOpen(false);
+    setBomModalOpen(true);
+  };
+
+  const handleSaveForecast = () => {
+    const newRecord: SavedDemandRecord = {
+      id: `DEM-${dayjs().format('YYYYMMDD-HHmmss')}`,
+      date: currentDateForecast.dateStr,
+      weatherCondition: currentDateForecast.weatherCondition,
+      temperature: currentDateForecast.temperature,
+      isHoliday: currentDateForecast.isHoliday,
+      dayDetails: currentDateForecast.dayDetails,
+      demandedCount: currentDateForecast.demandingCount,
+      modelAccuracy: currentDateForecast.confidenceScore,
+    };
+
+    setSavedDemandRecords((prev) => [
+      newRecord,
+      ...prev.filter((r) => r.date !== newRecord.date),
+    ]);
+    successToast(`Forecast for ${currentDateForecast.formattedDate} saved to records!`);
+  };
 
   const selectedAIPredictedBOM = useMemo(() => {
     if (!aiBOMCheckModal) return null;
@@ -2341,180 +2617,679 @@ const ChefOperationsDesk: React.FC = () => {
       {/* ========================================================================= */}
       {activeTab === 'AI_FORECASTING' && (
         <div className="animate-in fade-in space-y-6 duration-300">
-          {/* AI Metric Cards Grid */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Card 1: Predicted Guests */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Predicted Guests Tomorrow
-                  </p>
-                  <h3 className="font-spaceGrotesk mt-1 text-3xl font-black text-[#092968]">
-                    {aiForecast.predictedGuestCount} Pax
-                  </h3>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#092968]">
-                  <Utensils size={24} />
-                </div>
+          {/* SECTION 1: TOP BAR WITH HEADER & HIGHLIGHTED DATE PICKER */}
+          <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-[#F26E22] shadow-xs">
+                <Sparkles size={22} />
               </div>
-              <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                <TrendingUp size={16} />
-                <span>+{aiForecast.occupancyTrend}% vs 7-day average</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-spaceGrotesk text-xl font-black text-[#092968]">
+                    AI Demand Forecasting
+                  </h2>
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800">
+                    Live Model
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Predictive kitchen portion estimation. Tweak parameters below to recalculate demand live.
+                </p>
               </div>
-            </Card>
+            </div>
 
-            {/* Card 2: Weather Impact */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Weather Impact Analysis
-                  </p>
-                  <h3 className="font-spaceGrotesk mt-1 text-3xl font-black text-[#F26E22]">
-                    {aiForecast.weatherSummary.temperature}°C Sunny
-                  </h3>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-[#F26E22]">
-                  <CloudSun size={24} />
-                </div>
+            {/* Highlighted DatePicker Box */}
+            <div className="flex items-center gap-3 rounded-2xl border-2 border-[#F26E22] bg-orange-50/70 p-2.5 shadow-sm">
+              <div className="flex items-center gap-2 pl-2">
+                <Calendar className="text-[#F26E22]" size={18} />
+                <span className="text-xs font-black uppercase tracking-wider text-[#092968]">
+                  Forecast Date:
+                </span>
               </div>
-              <p className="mt-2 text-[11px] font-semibold leading-tight text-slate-600">
-                {aiForecast.weatherSummary.impactNote}
-              </p>
-            </Card>
+              <DatePicker
+                value={selectedForecastDate}
+                onChange={(date) => {
+                  if (date) setSelectedForecastDate(date);
+                }}
+                format="YYYY-MM-DD"
+                allowClear={false}
+                className="h-11 min-w-[170px] rounded-xl border-orange-300 bg-white px-3 font-mono text-sm font-black text-[#092968] shadow-xs hover:border-[#F26E22] focus:border-[#F26E22]"
+              />
+            </div>
+          </div>
 
-            {/* Card 3: Hotel Occupancy */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
+          {/* SECTION 2: 4 METRIC CARDS (INTERACTIVE WEATHER, TEMP, HOLIDAY, DATE DETAILS) */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Card 1: Weather Condition (Editable: Clear, Rainy, Cloudy) */}
+            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Hotel Occupancy Rate
+                    Weather Condition
                   </p>
-                  <h3 className="font-spaceGrotesk mt-1 text-3xl font-black text-[#092968]">
-                    {aiForecast.occupancyRate}%
+                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#092968]">
+                    {manualWeather}
                   </h3>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                  <ShieldCheck size={24} />
+                <div
+                  className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
+                    manualWeather === 'Clear'
+                      ? 'bg-amber-50 text-amber-500'
+                      : manualWeather === 'Rainy'
+                        ? 'bg-blue-50 text-blue-500'
+                        : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {manualWeather === 'Clear' && <Sun size={22} />}
+                  {manualWeather === 'Rainy' && <CloudRain size={22} />}
+                  {manualWeather === 'Cloudy' && <Cloud size={22} />}
                 </div>
               </div>
               <div className="mt-3">
-                <Progress
-                  percent={aiForecast.occupancyRate}
-                  strokeColor="#F26E22"
-                  showInfo={false}
+                <Select
+                  value={manualWeather}
+                  onChange={(val) => setManualWeather(val)}
+                  className="h-9 w-full rounded-xl text-xs font-bold"
+                  options={[
+                    { value: 'Clear', label: 'Clear' },
+                    { value: 'Rainy', label: 'Rainy' },
+                    { value: 'Cloudy', label: 'Cloudy' },
+                  ]}
                 />
               </div>
             </Card>
 
-            {/* Card 4: Peak Rush Time */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
+            {/* Card 2: Temperature (Editable Stepper) */}
+            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Peak Kitchen Rush Hour
+                    Temperature
                   </p>
-                  <h3 className="font-spaceGrotesk mt-1 text-lg font-black text-[#092968]">
-                    07:30 - 09:30 AM
+                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#F26E22]">
+                    {manualTemp}°C
                   </h3>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-                  <FlameKindling size={24} />
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50 text-[#F26E22]">
+                  <Thermometer size={22} />
                 </div>
               </div>
-              <p className="mt-2 text-[11px] font-semibold text-rose-700">
-                ⚠️ Breakfast rush load: Extreme Peak. Deploy 3 line cooks.
-              </p>
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setManualTemp((t) => Math.max(18, t - 1))}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 font-black text-slate-700 hover:bg-slate-100 active:scale-95"
+                >
+                  <Minus size={14} />
+                </button>
+                <div className="flex-1 text-center font-mono text-xs font-bold text-slate-500">
+                  Feels like {manualTemp + 2}°C
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setManualTemp((t) => Math.min(45, t + 1))}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 font-black text-slate-700 hover:bg-slate-100 active:scale-95"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </Card>
+
+            {/* Card 3: Is Holiday? (Editable Toggle Switch) */}
+            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Is Holiday?
+                  </p>
+                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#092968]">
+                    {isHoliday ? 'Yes' : 'No'}
+                  </h3>
+                </div>
+                <div
+                  className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
+                    isHoliday
+                      ? 'bg-purple-100 text-purple-600'
+                      : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  <Sparkles size={22} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">
+                  {isHoliday ? 'Holiday Surge (+45 Pax)' : 'Regular Business Day'}
+                </span>
+                <Switch
+                  checked={isHoliday}
+                  onChange={(checked) => setIsHoliday(checked)}
+                />
+              </div>
+            </Card>
+
+            {/* Card 4: Date Details */}
+            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Date Details
+                  </p>
+                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#092968]">
+                    {currentDateForecast.dayOfWeek}
+                  </h3>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-[#092968]">
+                  <CalendarDays size={22} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <Tag
+                  color={currentDateForecast.dayType === 'Weekend' ? 'volcano' : 'cyan'}
+                  className="rounded-md font-bold"
+                >
+                  {currentDateForecast.dayType}
+                </Tag>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {currentDateForecast.formattedDate}
+                </span>
+              </div>
             </Card>
           </div>
 
-          {/* Highly Demanded Items List */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="font-spaceGrotesk text-xl font-black text-[#092968]">
-                  Highly Demanded Dishes (Tomorrow's Top 5 Forecast)
+          {/* SECTION 3: MIDDLE SECTION - DEMANDING COUNT & BOM BUTTON */}
+          <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-[#092968] via-[#0c327a] to-[#12429c] p-6 text-white shadow-sm md:p-8">
+            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-lg bg-white/15 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider text-orange-300 backdrop-blur-md">
+                    AI Forecast Engine Output
+                  </span>
+                  <span className="rounded-lg bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold text-emerald-300 backdrop-blur-md">
+                    ✓ 79% Model Accuracy
+                  </span>
+                </div>
+                <h3 className="font-spaceGrotesk text-xs font-extrabold uppercase tracking-wider text-blue-200">
+                  Predicted Demanding Count
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Verify raw material warehouse readiness before morning prep begins
+                <div className="flex items-baseline gap-3">
+                  <span className="font-spaceGrotesk font-mono text-5xl font-black text-white md:text-6xl">
+                    {currentDateForecast.demandingCount}
+                  </span>
+                  <span className="text-lg font-bold text-orange-400">
+                    Portions / Covers
+                  </span>
+                </div>
+                <p className="max-w-2xl text-xs text-blue-200">
+                  Estimated kitchen dining load for <span className="font-bold text-white">{currentDateForecast.formattedDate}</span> ({currentDateForecast.dayDetails}) based on {manualWeather.toLowerCase()} weather ({manualTemp}°C) and {isHoliday ? 'holiday demand' : 'regular dining day'}.
                 </p>
               </div>
-              <span className="rounded-xl bg-orange-100 px-3 py-1.5 text-xs font-black text-[#F26E22]">
-                ⚡ AI Prep Recommendations Ready
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleOpenForecastBOMDrawer}
+                  className="active:scale-98 flex h-13 items-center justify-center gap-2.5 rounded-2xl bg-[#F26E22] px-6 text-sm font-black text-white shadow-lg shadow-orange-950/30 transition-all hover:bg-[#d95a14]"
+                >
+                  <Boxes size={20} />
+                  <span>Check BOM for {currentDateForecast.demandingCount} Count</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveForecast}
+                  className="active:scale-98 flex h-13 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 text-xs font-bold text-white backdrop-blur-md transition-all hover:bg-white/20"
+                >
+                  <BookmarkPlus size={18} />
+                  <span>Save Forecast</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 4: LAST SECTION - SAVED DEMAND VALUES ROWS */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+            <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
+                  Saved Demand Values
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Historical and logged demand predictions with BOM recipe requirements
+                </p>
+              </div>
+              <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-[#092968]">
+                {savedDemandRecords.length} Saved Records
               </span>
             </div>
 
-            {/* Items Grid */}
-            <div className="mt-6 space-y-4">
-              {aiForecast.predictedItems.map((item, idx) => (
-                <div
-                  key={item.itemId}
-                  className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-all hover:border-[#F26E22]/40 hover:bg-orange-50/20 lg:flex-row lg:items-center lg:justify-between"
-                >
-                  {/* Left: Item info */}
-                  <div className="flex items-start gap-4">
-                    <div className="font-spaceGrotesk flex h-12 w-12 items-center justify-center rounded-2xl bg-[#092968] text-lg font-black text-white">
-                      #{idx + 1}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-spaceGrotesk text-base font-extrabold text-[#092968]">
-                          {item.itemName}
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <th className="px-4 py-3.5">Date</th>
+                    <th className="px-4 py-3.5">Weather</th>
+                    <th className="px-4 py-3.5 text-center">Temp</th>
+                    <th className="px-4 py-3.5">Is Holiday</th>
+                    <th className="px-4 py-3.5">Date Details</th>
+                    <th className="px-4 py-3.5 text-center">Demanded Count</th>
+                    <th className="px-4 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {savedDemandRecords.map((rec) => (
+                    <tr key={rec.id} className="transition-colors hover:bg-slate-50/80">
+                      <td className="px-4 py-3.5 font-bold text-[#092968]">
+                        {rec.date}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
+                          {rec.weatherCondition === 'Clear' && (
+                            <Sun size={15} className="text-amber-500" />
+                          )}
+                          {rec.weatherCondition === 'Rainy' && (
+                            <CloudRain size={15} className="text-blue-500" />
+                          )}
+                          {rec.weatherCondition === 'Cloudy' && (
+                            <Cloud size={15} className="text-slate-500" />
+                          )}
+                          {rec.weatherCondition}
                         </span>
-                        <Tag color="orange" className="rounded-md text-xs font-bold">
-                          {item.category}
-                        </Tag>
-                        <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800">
-                          +{item.trendPercentage}% Surge
+                      </td>
+                      <td className="px-4 py-3.5 text-center font-mono font-bold text-slate-700">
+                        {rec.temperature}°C
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {rec.isHoliday.startsWith('Yes') ? (
+                          <Tag color="purple" className="rounded-md text-[11px] font-bold">
+                            Yes
+                          </Tag>
+                        ) : (
+                          <Tag
+                            color="default"
+                            className="rounded-md text-[11px] font-medium text-slate-500"
+                          >
+                            No
+                          </Tag>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 font-medium text-slate-600">
+                        {rec.dayDetails}
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="rounded-full bg-orange-100 px-3 py-1 font-mono text-xs font-black text-[#F26E22]">
+                          {rec.demandedCount} Pax
                         </span>
-                      </div>
-                      <p className="mt-1 text-xs font-semibold text-slate-600">
-                        Peak Service:{' '}
-                        <span className="font-bold text-[#092968]">
-                          {item.peakServingTime}
-                        </span>{' '}
-                        • Recommended Prep Window:{' '}
-                        <span className="font-bold text-[#F26E22]">
-                          {item.recommendedPrepWindow}
-                        </span>
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-slate-400">
-                        Weather factor: {item.weatherFactor}
-                      </p>
-                    </div>
-                  </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <Button
+                          onClick={() => {
+                            const defaultDishes = [
+                              {
+                                itemId: 'F-005',
+                                name: 'Devilled Lagoon Prawns with Fried Rice',
+                                quantity: Math.round(rec.demandedCount * 0.35),
+                              },
+                              {
+                                itemId: 'F-008',
+                                name: 'Grilled Herb Butter Reef Fish',
+                                quantity: Math.round(rec.demandedCount * 0.25),
+                              },
+                              {
+                                itemId: 'F-001',
+                                name: 'Sri Lankan String Hoppers with Kiri Hodi',
+                                quantity: Math.round(rec.demandedCount * 0.25),
+                              },
+                              {
+                                itemId: 'F-006',
+                                name: 'Spicy Chicken Curry with Basmati',
+                                quantity: Math.round(rec.demandedCount * 0.15),
+                              },
+                            ];
 
-                  {/* Right: Predicted Portions & Action */}
-                  <div className="flex items-center justify-between gap-4 border-t border-slate-200 pt-3 lg:justify-end lg:border-t-0 lg:pt-0">
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold uppercase text-slate-400">
-                        Predicted Demand
-                      </p>
-                      <p className="font-mono text-2xl font-black text-[#F26E22]">
-                        {item.predictedPortions} Portions
-                      </p>
-                      <p className="text-[10px] font-semibold text-emerald-600">
-                        {item.confidenceScore}% Model Confidence
-                      </p>
-                    </div>
+                            const calculatedResults: CalculatedOrderBOMFoodItem[] = defaultDishes.map((dish) => {
+                              const breakdown = calculateBOMBreakdown(dish.name, dish.quantity, dish.itemId);
+                              return {
+                                ItemId: dish.itemId,
+                                itemId: dish.itemId,
+                                itemName: dish.name,
+                                required_quantity: dish.quantity,
+                                rawMaterialDetails: breakdown.materials.map((m) => ({
+                                  materialId: m.materialId,
+                                  materialName: m.materialName,
+                                  category: m.category,
+                                  unitOfMeasure: m.unitOfMeasure,
+                                  qtyPerPerson: m.qtyPerPerson,
+                                  orderedQty: dish.quantity,
+                                  totalRequiredQty: m.totalRequiredQty,
+                                  quantityOnHand: m.quantityOnHand,
+                                  status: m.isShortage ? 'Shortage' : 'In Stock',
+                                  isShortage: m.isShortage,
+                                  shortageQty: m.shortageQty,
+                                })),
+                              };
+                            });
 
-                    {/* Touch Button: Check BOM Inventory */}
-                    <button
-                      onClick={() => {
-                        setAiBOMCheckModal(item);
-                        setIsRequisitionSent(false);
-                      }}
-                      className="active:scale-98 flex h-12 items-center gap-2 rounded-2xl bg-[#092968] px-5 text-xs font-extrabold text-white shadow-md transition-all hover:bg-[#0c3585]"
-                    >
-                      <Boxes size={16} />
-                      <span>Check BOM Inventory</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                            setOrderBOMResults(calculatedResults);
+                            setSelectedBulkItem({
+                              dishName: `Saved Demand Recipe Breakdown (${rec.date})`,
+                              orderNumber: `SAVED-${rec.date.replace(/-/g, '').slice(4)}`,
+                              portionCount: rec.demandedCount,
+                              mealSession: 'SAVED_FORECAST',
+                              orderTicketId: `SAVED-${rec.id}`,
+                              items: defaultDishes,
+                            });
+                            setBomModalOpen(true);
+                          }}
+                          className="h-8 rounded-xl bg-[#092968] text-xs font-bold text-white hover:bg-[#0c3585]"
+                          icon={<Boxes size={13} />}
+                        >
+                          Check BOM
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
+
+          {/* ========================================================================= */}
+          {/* DRAWER: FORECAST PORTION ALLOCATION & DISH SELECTION SIDEBAR */}
+          {/* ========================================================================= */}
+          <Drawer
+            title={
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 pr-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-[#F26E22]">
+                    <Boxes size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
+                      Forecast Portion Allocation & BOM
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Pick dishes and allocate portions for {currentDateForecast.demandingCount} predicted covers
+                    </p>
+                  </div>
+                </div>
+              </div>
+            }
+            placement="right"
+            width={620}
+            open={isForecastBOMDrawerOpen}
+            onClose={() => setIsForecastBOMDrawerOpen(false)}
+            footer={
+              <div className="flex items-center justify-between p-2">
+                <div>
+                  <p className="text-[11px] font-bold uppercase text-slate-400">
+                    Allocated Portions
+                  </p>
+                  <p className="font-mono text-base font-black text-[#092968]">
+                    {allocatedPortionsSum} / {currentDateForecast.demandingCount} Pax{' '}
+                    <span className="text-xs font-normal text-slate-400">
+                      ({selectedAllocatedCount} Dishes Selected)
+                    </span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setIsForecastBOMDrawerOpen(false)}
+                    className="h-11 rounded-xl px-4 font-bold"
+                  >
+                    Cancel
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={handleCalculateAllocatedBOM}
+                    className="active:scale-98 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-black text-white shadow-md hover:bg-[#d95a14]"
+                  >
+                    <Boxes size={16} />
+                    <span>Calculate BOM ({allocatedPortionsSum} Portions)</span>
+                  </button>
+                </div>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              {/* Allocation Target Header Progress Box */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                      Target Predicted Demand
+                    </p>
+                    <p className="font-mono text-2xl font-black text-[#092968]">
+                      {currentDateForecast.demandingCount} Covers
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                      Currently Allocated
+                    </p>
+                    <p
+                      className={`font-mono text-2xl font-black ${
+                        allocatedPortionsSum === currentDateForecast.demandingCount
+                          ? 'text-emerald-600'
+                          : allocatedPortionsSum > currentDateForecast.demandingCount
+                            ? 'text-orange-600'
+                            : 'text-[#092968]'
+                      }`}
+                    >
+                      {allocatedPortionsSum} Pax
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
+                  <span className="text-xs font-bold text-slate-600">
+                    {allocatedPortionsSum === currentDateForecast.demandingCount ? (
+                      <span className="text-emerald-600">✓ Exactly matches forecast demand</span>
+                    ) : allocatedPortionsSum < currentDateForecast.demandingCount ? (
+                      <span className="text-blue-600">
+                        Remaining: {currentDateForecast.demandingCount - allocatedPortionsSum} portions
+                      </span>
+                    ) : (
+                      <span className="text-orange-600">
+                        Exceeds by +{allocatedPortionsSum - currentDateForecast.demandingCount} portions
+                      </span>
+                    )}
+                  </span>
+
+                  <Button
+                    size="small"
+                    onClick={handleAutoDistributeForecastPortions}
+                    className="rounded-lg bg-orange-100 text-[11px] font-black text-[#F26E22] hover:bg-orange-200"
+                  >
+                    Auto-Distribute ({currentDateForecast.demandingCount} Pax)
+                  </Button>
+                </div>
+              </div>
+
+              {/* 1. SEARCHABLE FOOD ITEM SELECTOR FROM SYSTEM */}
+              <div className="space-y-1.5 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
+                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                  Search & Pick Food Items from System:
+                </label>
+                <Select
+                  showSearch
+                  placeholder="Select food dish to add to allocation..."
+                  value={null}
+                  onChange={(val) => {
+                    const found = availableAllocationFoodItems.find(
+                      (f) => f.itemId === val,
+                    );
+                    if (found) {
+                      setForecastFoodAllocations((prev) => {
+                        if (prev.some((p) => p.itemId === val)) {
+                          return prev.map((p) =>
+                            p.itemId === val
+                              ? {
+                                  ...p,
+                                  isSelected: true,
+                                  portions: p.portions > 0 ? p.portions : 25,
+                                }
+                              : p,
+                          );
+                        }
+                        return [
+                          {
+                            itemId: found.itemId,
+                            name: found.name,
+                            category: found.category,
+                            unitPrice: found.unitPrice,
+                            portions: 25,
+                            isSelected: true,
+                          },
+                          ...prev,
+                        ];
+                      });
+                      successToast(`Added "${found.name}" to allocation list!`);
+                    }
+                  }}
+                  filterOption={(input, option) =>
+                    String(option?.label ?? '')
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  className="h-11 w-full rounded-xl text-xs font-bold"
+                  options={availableAllocationFoodItems.map((f) => ({
+                    value: f.itemId,
+                    label: `${f.name} (${f.category}) - LKR ${f.unitPrice.toLocaleString()}`,
+                  }))}
+                />
+              </div>
+
+              {/* 2. ALLOCATED FOOD ITEMS LIST */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                    Allocated Menu Dishes ({forecastFoodAllocations.filter((f) => f.isSelected).length})
+                  </p>
+                  {forecastFoodAllocations.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setForecastFoodAllocations([])}
+                      className="text-[11px] font-bold text-rose-500 hover:underline"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2.5 max-h-[48vh] overflow-y-auto pr-1">
+                  {forecastFoodAllocations.filter((f) => f.isSelected).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center">
+                      <Utensils size={32} className="text-slate-300" />
+                      <p className="mt-2 text-xs font-bold text-slate-600">
+                        No Food Items Selected Yet
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Pick items from the dropdown above or click Auto-Distribute to load recommended menu dishes.
+                      </p>
+                      <Button
+                        size="small"
+                        onClick={handleAutoDistributeForecastPortions}
+                        className="mt-3 rounded-lg bg-[#092968] text-[11px] font-bold text-white hover:bg-[#0c3585]"
+                      >
+                        Auto-Select Top Dishes ({currentDateForecast.demandingCount} Pax)
+                      </Button>
+                    </div>
+                  ) : (
+                    forecastFoodAllocations
+                      .filter((item) => item.isSelected)
+                      .map((item) => (
+                        <div
+                          key={item.itemId}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/40 p-3.5 shadow-xs transition-all"
+                        >
+                          {/* Details */}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-spaceGrotesk text-xs font-extrabold text-[#092968]">
+                              {item.name}
+                            </p>
+                            <div className="mt-0.5 flex items-center gap-2">
+                              <Tag color="orange" className="m-0 rounded-md text-[10px] font-bold">
+                                {item.category}
+                              </Tag>
+                              <span className="text-[11px] font-semibold text-slate-400">
+                                LKR {item.unitPrice.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Stepper + Remove */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setForecastFoodAllocations((prev) =>
+                                    prev.map((f) =>
+                                      f.itemId === item.itemId
+                                        ? { ...f, portions: Math.max(0, f.portions - 5) }
+                                        : f,
+                                    ),
+                                  );
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white font-black text-slate-700 hover:bg-slate-100 active:scale-95"
+                              >
+                                <Minus size={12} />
+                              </button>
+
+                              <InputNumber
+                                min={0}
+                                max={1000}
+                                value={item.portions}
+                                onChange={(val) => {
+                                  setForecastFoodAllocations((prev) =>
+                                    prev.map((f) =>
+                                      f.itemId === item.itemId
+                                        ? { ...f, portions: Number(val) || 0 }
+                                        : f,
+                                    ),
+                                  );
+                                }}
+                                className="w-18 font-mono text-center font-bold"
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setForecastFoodAllocations((prev) =>
+                                    prev.map((f) =>
+                                      f.itemId === item.itemId
+                                        ? { ...f, portions: f.portions + 5 }
+                                        : f,
+                                    ),
+                                  );
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white font-black text-slate-700 hover:bg-slate-100 active:scale-95"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForecastFoodAllocations((prev) =>
+                                  prev.filter((f) => f.itemId !== item.itemId),
+                                );
+                              }}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                              title="Remove item"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </Drawer>
         </div>
       )}
 

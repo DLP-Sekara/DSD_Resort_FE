@@ -14,6 +14,7 @@ import GuestFeedback from '../pages/guestFeedback/GuestFeedback';
 import Users from '../pages/users/Users';
 import Settings from '../pages/settings/Settings';
 import UserGuide from '../pages/UserGuide/UserGuide';
+import PublicFeedback from '../pages/publicFeedback/PublicFeedback';
 import ProtectedRoute from './ProtectedStep';
 import RoleProtectedRoute from './RoleProtectedRoute';
 import { useAuth } from '../hooks/useAuth';
@@ -39,6 +40,7 @@ const Routers = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/server-error" element={<ServerError />} />
       <Route path="/user-guide" element={<UserGuide />} />
+      <Route path="/feedback" element={<PublicFeedback />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
 
       <Route element={<ProtectedRoute isAuthenticated={isAuthenticated} />}>
