@@ -1,23 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  Modal,
-  Tag,
-  Button,
-  Input,
-  Select,
-  Card,
-  Tooltip,
-  Spin,
-  DatePicker,
-  Drawer,
-  InputNumber,
-  Switch,
-} from 'antd';
+import AIDemandForecastingTab from './components/AIDemandForecastingTab';
+import { Modal, Tag, Button, Input, Select, Card, Tooltip, Spin } from 'antd';
 import {
   Flame,
   Clock,
   CheckCircle2,
-  AlertTriangle,
   RotateCw,
   Search,
   Sparkles,
@@ -37,15 +24,6 @@ import {
   Eye,
   Printer,
   Download,
-  Sun,
-  CloudRain,
-  Cloud,
-  Thermometer,
-  CalendarDays,
-  BookmarkPlus,
-  Plus,
-  Minus,
-  Trash2,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -57,6 +35,7 @@ import mealMutation from '../../mutations/meal.mutation';
 import bomMutation from '../../mutations/bom.mutation';
 import bomUsageLogMutation from '../../mutations/bomUsageLog.mutation';
 import restaurantOrderMutation from '../../mutations/restaurantOrder.mutation';
+import demandForecastMutation from '../../mutations/demandForecast.mutation';
 import { useAuth } from '../../hooks/useAuth';
 import { successToast, errorToast } from '../../components/common/Alert';
 import type {
@@ -74,7 +53,6 @@ import type {
   BulkMealRequirement,
   BOMCalculationDetail,
   ProductionLogEntry,
-  AIPredictedItem,
 } from '../../types/chefPortal.interfaces';
 
 dayjs.extend(relativeTime);
@@ -183,146 +161,6 @@ const INITIAL_BULK_REQUIREMENTS: BulkMealRequirement[] = [
     ],
   },
 ];
-
-export interface SavedDemandRecord {
-  id: string;
-  date: string;
-  weatherCondition: 'Clear' | 'Rainy' | 'Cloudy';
-  temperature: number;
-  isHoliday: string;
-  dayDetails: string;
-  demandedCount: number;
-  modelAccuracy: number;
-}
-
-const DEFAULT_MENU_ITEMS = [
-  { itemId: 'F-001', name: 'Sri Lankan String Hoppers with Kiri Hodi', category: 'Breakfast', unitPrice: 850 },
-  { itemId: 'F-002', name: 'Scrambled Farm Eggs & Sausages', category: 'Continental', unitPrice: 1200 },
-  { itemId: 'F-003', name: 'Tropical Fresh Fruit Platter', category: 'Fruits', unitPrice: 650 },
-  { itemId: 'F-004', name: 'Freshly Brewed Ceylon Milk Tea', category: 'Beverages', unitPrice: 350 },
-  { itemId: 'F-005', name: 'Devilled Lagoon Prawns with Fried Rice', category: 'Seafood', unitPrice: 2400 },
-  { itemId: 'F-006', name: 'Spicy Chicken Curry with Basmati', category: 'Main Dish', unitPrice: 1850 },
-  { itemId: 'F-007', name: 'Dhal Curry in Coconut Milk', category: 'Curry', unitPrice: 650 },
-  { itemId: 'F-008', name: 'Grilled Herb Butter Reef Fish', category: 'Grill', unitPrice: 2800 },
-  { itemId: 'F-009', name: 'Barbecue Spiced Pork Ribs & Chicken', category: 'Grill', unitPrice: 3200 },
-  { itemId: 'F-010', name: 'Garlic Butter Naan & Steamed Rice', category: 'Sides', unitPrice: 750 },
-];
-
-const INITIAL_SAVED_DEMANDS: SavedDemandRecord[] = [
-  {
-    id: 'DEM-001',
-    date: '2026-08-28',
-    weatherCondition: 'Clear',
-    temperature: 31,
-    isHoliday: 'No (Regular Day)',
-    dayDetails: 'Friday • Weekday',
-    demandedCount: 128,
-    modelAccuracy: 96.4,
-  },
-  {
-    id: 'DEM-002',
-    date: '2026-08-27',
-    weatherCondition: 'Cloudy',
-    temperature: 29,
-    isHoliday: 'No (Regular Day)',
-    dayDetails: 'Thursday • Weekday',
-    demandedCount: 114,
-    modelAccuracy: 95.8,
-  },
-  {
-    id: 'DEM-003',
-    date: '2026-08-24',
-    weatherCondition: 'Clear',
-    temperature: 32,
-    isHoliday: 'Yes - Poson Poya Holiday',
-    dayDetails: 'Monday • Public Holiday',
-    demandedCount: 165,
-    modelAccuracy: 98.1,
-  },
-  {
-    id: 'DEM-004',
-    date: '2026-08-23',
-    weatherCondition: 'Rainy',
-    temperature: 27,
-    isHoliday: 'No (Regular Day)',
-    dayDetails: 'Sunday • Weekend',
-    demandedCount: 138,
-    modelAccuracy: 94.2,
-  },
-  {
-    id: 'DEM-005',
-    date: '2026-08-22',
-    weatherCondition: 'Clear',
-    temperature: 33,
-    isHoliday: 'No (Regular Day)',
-    dayDetails: 'Saturday • Weekend',
-    demandedCount: 152,
-    modelAccuracy: 97.0,
-  },
-];
-
-const getForecastForDate = (targetDate: dayjs.Dayjs) => {
-  const dayOfWeek = targetDate.format('dddd');
-  const isWeekend = targetDate.day() === 0 || targetDate.day() === 6;
-  const dayType = isWeekend ? 'Weekend' : 'Weekday';
-  const dayDetails = `${dayOfWeek} • ${dayType}`;
-
-  // Deterministic seed based on day + month
-  const dayOfYear = targetDate.month() * 31 + targetDate.date();
-
-  // Weather condition
-  const weatherOptions: Array<'Clear' | 'Rainy' | 'Cloudy'> = [
-    'Clear',
-    'Rainy',
-    'Cloudy',
-    'Clear',
-    'Clear',
-  ];
-  const weatherCondition = weatherOptions[Math.abs(dayOfYear) % weatherOptions.length];
-
-  // Temperature (27°C - 33°C)
-  const temperature = 28 + (Math.abs(dayOfYear * 7) % 6);
-
-  // Holiday detection
-  const month = targetDate.month() + 1; // 1-12
-  const day = targetDate.date();
-
-  let isHoliday = 'No (Regular Day)';
-  if (month === 1 && day === 1) isHoliday = 'Yes - New Year Day';
-  else if (month === 2 && day === 4) isHoliday = 'Yes - National Independence Day';
-  else if (month === 4 && (day === 13 || day === 14))
-    isHoliday = 'Yes - Sinhala & Tamil New Year';
-  else if (month === 5 && (day === 15 || day === 23))
-    isHoliday = 'Yes - Vesak Full Moon Poya';
-  else if (month === 6 && day === 21) isHoliday = 'Yes - Poson Full Moon Poya';
-  else if (month === 8 && day === 19) isHoliday = 'Yes - Nikini Full Moon Poya';
-  else if (month === 8 && day === 28) isHoliday = 'Yes - Resort Gala Banquet Day';
-  else if (month === 12 && day === 25) isHoliday = 'Yes - Christmas Day';
-  else if (day === 15 || day === 28) isHoliday = 'Yes - Public Poya Holiday';
-
-  // Base Demand calculation
-  let baseDemand = 80;
-  if (isWeekend) baseDemand += 35;
-  if (isHoliday.startsWith('Yes')) baseDemand += 42;
-  if (weatherCondition === 'Clear') baseDemand += 15;
-  else if (weatherCondition === 'Cloudy') baseDemand += 8;
-  else if (weatherCondition === 'Rainy') baseDemand -= 6;
-
-  const demandingCount = baseDemand + (Math.abs(dayOfYear * 3) % 18);
-
-  return {
-    dateStr: targetDate.format('YYYY-MM-DD'),
-    formattedDate: targetDate.format('DD MMM YYYY'),
-    weatherCondition,
-    temperature,
-    isHoliday,
-    dayDetails,
-    dayOfWeek,
-    dayType,
-    demandingCount,
-    confidenceScore: 94 + (Math.abs(dayOfYear) % 6),
-  };
-};
 
 const INITIAL_A_LA_CARTE_TICKETS: KDSOrderTicket[] = [
   {
@@ -478,6 +316,8 @@ const ChefOperationsDesk: React.FC = () => {
   const { data: bomTemplatesRes } = getAllBOMTemplatesQuery();
   const { mutateAsync: calculateOrderBOMApi } = calculateOrderBOMMutation();
   const { mutateAsync: logBOMUsageApi } = logBOMUsageMutation();
+  const { addDemandForecastMutation } = demandForecastMutation();
+  const { mutateAsync: addDemandForecastApi, isPending: isSavingForecast } = addDemandForecastMutation();
 
   // State for Tab 2 BOM filter
   const [selectedBOMFilter, setSelectedBOMFilter] = useState<string>('ALL');
@@ -494,10 +334,7 @@ const ChefOperationsDesk: React.FC = () => {
     data: templateBOMUsageLogsRes,
     refetch: refetchTemplateLogs,
     isFetching: isFetchingTemplateLogs,
-  } = getBOMUsageLogsByTemplateIdQuery(
-    selectedBOMFilter,
-    selectedBOMFilter !== 'ALL',
-  );
+  } = getBOMUsageLogsByTemplateIdQuery(selectedBOMFilter, selectedBOMFilter !== 'ALL');
 
   const isFetchingBOMUsageLogs = isFetchingAllLogs || isFetchingTemplateLogs;
 
@@ -689,7 +526,9 @@ const ChefOperationsDesk: React.FC = () => {
   // TAB 1 (BULK MEALS & KDS): BOM CALCULATION MODAL
   // -------------------------------------------------------------------------
   const [bomModalOpen, setBomModalOpen] = useState(false);
-  const [orderBOMResults, setOrderBOMResults] = useState<CalculatedOrderBOMFoodItem[]>([]);
+  const [orderBOMResults, setOrderBOMResults] = useState<CalculatedOrderBOMFoodItem[]>(
+    [],
+  );
   const [isCalculatingOrderBOM, setIsCalculatingOrderBOM] = useState(false);
   const [selectedBulkItem, setSelectedBulkItem] = useState<{
     dishName: string;
@@ -699,6 +538,7 @@ const ChefOperationsDesk: React.FC = () => {
     orderTicketId?: string;
     orderNumber?: string;
     items?: { itemId?: string; name: string; quantity: number }[];
+    forecastContext?: any;
   } | null>(null);
 
   // Fetch and Calculate BOM from Backend API for Order
@@ -1351,11 +1191,7 @@ const ChefOperationsDesk: React.FC = () => {
         '';
 
       const targetChefId =
-        log.cookedBy ||
-        log.cooked_by ||
-        log.userId ||
-        log.chefId ||
-        '';
+        log.cookedBy || log.cooked_by || log.userId || log.chefId || '';
 
       // Find template
       const template = bomTemplatesList.find(
@@ -1367,8 +1203,7 @@ const ChefOperationsDesk: React.FC = () => {
 
       const foodItem = template
         ? foodItemsList.find(
-            (f) =>
-              f.itemId === template.itemId || (f as any).id === template.itemId,
+            (f) => f.itemId === template.itemId || (f as any).id === template.itemId,
           )
         : foodItemsList.find(
             (f) => f.itemId === log.itemId || (f as any).id === log.itemId,
@@ -1408,8 +1243,7 @@ const ChefOperationsDesk: React.FC = () => {
           unitOfMeasure: m.unitOfMeasure,
         }));
 
-      const dateStr =
-        log.createdAt || log.created_at || log.timestamp || log.date;
+      const dateStr = log.createdAt || log.created_at || log.timestamp || log.date;
       const formattedDate = dateStr
         ? dayjs(dateStr).format('YYYY-MM-DD')
         : dayjs().format('YYYY-MM-DD');
@@ -1418,12 +1252,7 @@ const ChefOperationsDesk: React.FC = () => {
         : dayjs().format('hh:mm A');
 
       return {
-        id:
-          log.id ||
-          log.usageLogId ||
-          log.logId ||
-          log._uniqueId ||
-          `LOG-${idx + 1}`,
+        id: log.id || log.usageLogId || log.logId || log._uniqueId || `LOG-${idx + 1}`,
         batchCode:
           log.batchCode ||
           log.batchId ||
@@ -1482,251 +1311,6 @@ const ChefOperationsDesk: React.FC = () => {
 
   // -------------------------------------------------------------------------
   // TAB 3: AI DEMAND FORECASTING STATE & INTERACTIVE CONTROLS
-  // -------------------------------------------------------------------------
-  const [selectedForecastDate, setSelectedForecastDate] = useState<dayjs.Dayjs>(dayjs());
-  const [savedDemandRecords, setSavedDemandRecords] = useState<SavedDemandRecord[]>(
-    INITIAL_SAVED_DEMANDS,
-  );
-  const [aiBOMCheckModal, setAiBOMCheckModal] = useState<AIPredictedItem | null>(null);
-  const [isRequisitionSent, setIsRequisitionSent] = useState(false);
-
-  // Manual interactive state for Weather (Clear, Rainy, Cloudy), Temperature, and Boolean Holiday
-  const [manualWeather, setManualWeather] = useState<'Clear' | 'Rainy' | 'Cloudy'>('Clear');
-  const [manualTemp, setManualTemp] = useState<number>(31);
-  const [isHoliday, setIsHoliday] = useState<boolean>(false);
-
-  // Auto sync defaults whenever selected date changes
-  useEffect(() => {
-    const def = getForecastForDate(selectedForecastDate || dayjs());
-    setManualWeather(def.weatherCondition);
-    setManualTemp(def.temperature);
-    setIsHoliday(def.isHoliday.startsWith('Yes'));
-  }, [selectedForecastDate]);
-
-  // Reactive Demand Count calculation according to date and interactive card adjustments
-  const currentDateForecast = useMemo(() => {
-    const targetDate = selectedForecastDate || dayjs();
-    const dayOfWeek = targetDate.format('dddd');
-    const isWeekend = targetDate.day() === 0 || targetDate.day() === 6;
-    const dayType = isWeekend ? 'Weekend' : 'Weekday';
-    const dayDetails = `${dayOfWeek} • ${dayType}`;
-
-    let baseDemand = 80;
-    if (isWeekend) baseDemand += 35;
-    if (isHoliday) baseDemand += 45;
-    if (manualWeather === 'Clear') baseDemand += 15;
-    else if (manualWeather === 'Cloudy') baseDemand += 5;
-    else if (manualWeather === 'Rainy') baseDemand -= 8;
-
-    if (manualTemp > 30) baseDemand += (manualTemp - 30) * 2;
-    else if (manualTemp < 26) baseDemand -= (26 - manualTemp) * 2;
-
-    const demandingCount = Math.max(25, baseDemand);
-
-    return {
-      dateStr: targetDate.format('YYYY-MM-DD'),
-      formattedDate: targetDate.format('DD MMM YYYY'),
-      weatherCondition: manualWeather,
-      temperature: manualTemp,
-      isHoliday: isHoliday ? 'Yes (Holiday)' : 'No (Regular Day)',
-      isHolidayBool: isHoliday,
-      dayDetails,
-      dayOfWeek,
-      dayType,
-      demandingCount,
-      confidenceScore: 79, // fixed model accuracy as 79
-    };
-  }, [selectedForecastDate, manualWeather, manualTemp, isHoliday]);
-
-  // Available food items list for portion allocation in sidebar
-  const availableAllocationFoodItems = useMemo(() => {
-    const items: { itemId: string; name: string; category: string; unitPrice: number }[] = [];
-    if (foodItemsList && foodItemsList.length > 0) {
-      foodItemsList.forEach((f: any) => {
-        items.push({
-          itemId: f.itemId || f.id || 'F-ITEM',
-          name: f.name || f.itemName || 'Resort Dish',
-          category: f.category || 'Main Dish',
-          unitPrice: Number(f.unitPrice) || Number(f.price) || 1200,
-        });
-      });
-    } else {
-      DEFAULT_MENU_ITEMS.forEach((f) => items.push(f));
-    }
-    return items;
-  }, [foodItemsList]);
-
-  // Drawer allocation state
-  const [isForecastBOMDrawerOpen, setIsForecastBOMDrawerOpen] = useState(false);
-  const [forecastFoodAllocations, setForecastFoodAllocations] = useState<
-    { itemId: string; name: string; category: string; unitPrice: number; portions: number; isSelected: boolean }[]
-  >([]);
-
-  // Open drawer and initialize/sync portions with current demanding count
-  const handleOpenForecastBOMDrawer = () => {
-    const totalPax = currentDateForecast.demandingCount;
-    // If no allocations yet, initialize with top 4 dishes
-    if (forecastFoodAllocations.length === 0) {
-      const topDishes = availableAllocationFoodItems.slice(0, 4);
-      const baseShare = Math.floor(totalPax / topDishes.length);
-      const remainder = totalPax % topDishes.length;
-
-      const initialItems = topDishes.map((item, idx) => ({
-        itemId: item.itemId,
-        name: item.name,
-        category: item.category,
-        unitPrice: item.unitPrice,
-        portions: baseShare + (idx < remainder ? 1 : 0),
-        isSelected: true,
-      }));
-      setForecastFoodAllocations(initialItems);
-    }
-    setIsForecastBOMDrawerOpen(true);
-  };
-
-  const allocatedPortionsSum = useMemo(() => {
-    return forecastFoodAllocations
-      .filter((it) => it.isSelected)
-      .reduce((sum, it) => sum + (Number(it.portions) || 0), 0);
-  }, [forecastFoodAllocations]);
-
-  const selectedAllocatedCount = useMemo(() => {
-    return forecastFoodAllocations.filter((it) => it.isSelected).length;
-  }, [forecastFoodAllocations]);
-
-  // Optimized auto-distribution helper across selected items
-  const handleAutoDistributeForecastPortions = () => {
-    const totalPax = currentDateForecast.demandingCount;
-
-    setForecastFoodAllocations((prev) => {
-      let itemsToDistribute = prev.filter((p) => p.isSelected);
-
-      if (itemsToDistribute.length === 0) {
-        itemsToDistribute = availableAllocationFoodItems.slice(0, 4).map((f) => ({
-          itemId: f.itemId,
-          name: f.name,
-          category: f.category,
-          unitPrice: f.unitPrice,
-          portions: 0,
-          isSelected: true,
-        }));
-      }
-
-      const numItems = itemsToDistribute.length;
-      const baseShare = Math.floor(totalPax / numItems);
-      const remainder = totalPax % numItems;
-
-      const distributedMap = new Map<string, number>();
-      itemsToDistribute.forEach((item, index) => {
-        distributedMap.set(item.itemId, baseShare + (index < remainder ? 1 : 0));
-      });
-
-      const existingIds = new Set(prev.map((p) => p.itemId));
-      const newItemsToAdd = itemsToDistribute.filter(
-        (item) => !existingIds.has(item.itemId),
-      );
-
-      const updatedExisting = prev.map((item) => {
-        if (distributedMap.has(item.itemId)) {
-          return {
-            ...item,
-            isSelected: true,
-            portions: distributedMap.get(item.itemId) || 0,
-          };
-        }
-        return item;
-      });
-
-      return [
-        ...updatedExisting,
-        ...newItemsToAdd.map((item) => ({
-          ...item,
-          portions: distributedMap.get(item.itemId) || 0,
-        })),
-      ];
-    });
-
-    successToast(`Evenly distributed exact ${totalPax} portions across dishes!`);
-  };
-
-  // Launch BOM Calculation Modal from Drawer with multi-dish separated breakdown
-  const handleCalculateAllocatedBOM = () => {
-    const selected = forecastFoodAllocations.filter(
-      (it) => it.isSelected && it.portions > 0,
-    );
-    if (selected.length === 0) {
-      errorToast('Please select at least one food item with portion count greater than 0.');
-      return;
-    }
-
-    const calculatedResults: CalculatedOrderBOMFoodItem[] = selected.map((it) => {
-      const breakdown = calculateBOMBreakdown(it.name, it.portions, it.itemId);
-      return {
-        ItemId: it.itemId,
-        itemId: it.itemId,
-        itemName: it.name,
-        required_quantity: it.portions,
-        rawMaterialDetails: breakdown.materials.map((m) => ({
-          materialId: m.materialId,
-          materialName: m.materialName,
-          category: m.category,
-          unitOfMeasure: m.unitOfMeasure,
-          qtyPerPerson: m.qtyPerPerson,
-          orderedQty: it.portions,
-          totalRequiredQty: m.totalRequiredQty,
-          quantityOnHand: m.quantityOnHand,
-          status: m.isShortage ? 'Shortage' : 'In Stock',
-          isShortage: m.isShortage,
-          shortageQty: m.shortageQty,
-        })),
-      };
-    });
-
-    setOrderBOMResults(calculatedResults);
-    setSelectedBulkItem({
-      dishName: `AI Forecast Demand Allocation`,
-      orderNumber: `FCST-${selectedForecastDate.format('MMDD')}`,
-      portionCount: allocatedPortionsSum,
-      mealSession: 'FORECAST_ALLOCATION',
-      orderTicketId: `FCST-${selectedForecastDate.format('YYYYMMDD')}`,
-      items: selected.map((it) => ({
-        itemId: it.itemId,
-        name: it.name,
-        quantity: it.portions,
-      })),
-    });
-    setIsForecastBOMDrawerOpen(false);
-    setBomModalOpen(true);
-  };
-
-  const handleSaveForecast = () => {
-    const newRecord: SavedDemandRecord = {
-      id: `DEM-${dayjs().format('YYYYMMDD-HHmmss')}`,
-      date: currentDateForecast.dateStr,
-      weatherCondition: currentDateForecast.weatherCondition,
-      temperature: currentDateForecast.temperature,
-      isHoliday: currentDateForecast.isHoliday,
-      dayDetails: currentDateForecast.dayDetails,
-      demandedCount: currentDateForecast.demandingCount,
-      modelAccuracy: currentDateForecast.confidenceScore,
-    };
-
-    setSavedDemandRecords((prev) => [
-      newRecord,
-      ...prev.filter((r) => r.date !== newRecord.date),
-    ]);
-    successToast(`Forecast for ${currentDateForecast.formattedDate} saved to records!`);
-  };
-
-  const selectedAIPredictedBOM = useMemo(() => {
-    if (!aiBOMCheckModal) return null;
-    return calculateBOMBreakdown(
-      aiBOMCheckModal.itemName,
-      aiBOMCheckModal.predictedPortions,
-      aiBOMCheckModal.itemId,
-    );
-  }, [aiBOMCheckModal, bomTemplatesList, rawMaterialsList]);
-
   // Helper for Elapsed Time tag in KDS Kanban
   const getElapsedBadge = (createdAtStr: string, status: KDSOrderStatus) => {
     const elapsedMinutes = dayjs().diff(dayjs(createdAtStr), 'minute');
@@ -1758,6 +1342,8 @@ const ChefOperationsDesk: React.FC = () => {
     );
   };
 
+
+  console.log(userData);
   return (
     <div className="space-y-6 pb-12 font-sans text-slate-800">
       {/* ========================================================================= */}
@@ -2402,7 +1988,7 @@ const ChefOperationsDesk: React.FC = () => {
         <div className="animate-in fade-in space-y-6 duration-300">
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="shadow-xs flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#092968]">
                 <FileSpreadsheet size={24} />
               </div>
@@ -2416,7 +2002,7 @@ const ChefOperationsDesk: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="shadow-xs flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-[#F26E22]">
                 <Boxes size={24} />
               </div>
@@ -2425,12 +2011,16 @@ const ChefOperationsDesk: React.FC = () => {
                   Total Portions Cooked
                 </p>
                 <h3 className="font-spaceGrotesk text-2xl font-black text-[#F26E22]">
-                  {filteredProductionLogs.reduce((acc, curr) => acc + (curr.portionsCooked || 0), 0)} Pax
+                  {filteredProductionLogs.reduce(
+                    (acc, curr) => acc + (curr.portionsCooked || 0),
+                    0,
+                  )}{' '}
+                  Pax
                 </h3>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="shadow-xs flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                 <ShieldCheck size={24} />
               </div>
@@ -2454,7 +2044,8 @@ const ChefOperationsDesk: React.FC = () => {
                   BOM Production & Usage Logs
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Audit trail of meal batches cooked and raw materials deducted from warehouse
+                  Audit trail of meal batches cooked and raw materials deducted from
+                  warehouse
                 </p>
               </div>
 
@@ -2541,7 +2132,9 @@ const ChefOperationsDesk: React.FC = () => {
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-slate-400">
                         <Boxes size={36} className="mx-auto mb-2 opacity-30" />
-                        <p className="font-semibold text-slate-600">No BOM usage logs found</p>
+                        <p className="font-semibold text-slate-600">
+                          No BOM usage logs found
+                        </p>
                         <p className="text-xs text-slate-400">
                           {selectedBOMFilter !== 'ALL' || logSearchTerm
                             ? 'Try clearing the BOM template filter or search query.'
@@ -2616,681 +2209,13 @@ const ChefOperationsDesk: React.FC = () => {
       {/* TAB 3: AI DEMAND FORECASTING */}
       {/* ========================================================================= */}
       {activeTab === 'AI_FORECASTING' && (
-        <div className="animate-in fade-in space-y-6 duration-300">
-          {/* SECTION 1: TOP BAR WITH HEADER & HIGHLIGHTED DATE PICKER */}
-          <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-[#F26E22] shadow-xs">
-                <Sparkles size={22} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-spaceGrotesk text-xl font-black text-[#092968]">
-                    AI Demand Forecasting
-                  </h2>
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800">
-                    Live Model
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400">
-                  Predictive kitchen portion estimation. Tweak parameters below to recalculate demand live.
-                </p>
-              </div>
-            </div>
-
-            {/* Highlighted DatePicker Box */}
-            <div className="flex items-center gap-3 rounded-2xl border-2 border-[#F26E22] bg-orange-50/70 p-2.5 shadow-sm">
-              <div className="flex items-center gap-2 pl-2">
-                <Calendar className="text-[#F26E22]" size={18} />
-                <span className="text-xs font-black uppercase tracking-wider text-[#092968]">
-                  Forecast Date:
-                </span>
-              </div>
-              <DatePicker
-                value={selectedForecastDate}
-                onChange={(date) => {
-                  if (date) setSelectedForecastDate(date);
-                }}
-                format="YYYY-MM-DD"
-                allowClear={false}
-                className="h-11 min-w-[170px] rounded-xl border-orange-300 bg-white px-3 font-mono text-sm font-black text-[#092968] shadow-xs hover:border-[#F26E22] focus:border-[#F26E22]"
-              />
-            </div>
-          </div>
-
-          {/* SECTION 2: 4 METRIC CARDS (INTERACTIVE WEATHER, TEMP, HOLIDAY, DATE DETAILS) */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Card 1: Weather Condition (Editable: Clear, Rainy, Cloudy) */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Weather Condition
-                  </p>
-                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#092968]">
-                    {manualWeather}
-                  </h3>
-                </div>
-                <div
-                  className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-                    manualWeather === 'Clear'
-                      ? 'bg-amber-50 text-amber-500'
-                      : manualWeather === 'Rainy'
-                        ? 'bg-blue-50 text-blue-500'
-                        : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {manualWeather === 'Clear' && <Sun size={22} />}
-                  {manualWeather === 'Rainy' && <CloudRain size={22} />}
-                  {manualWeather === 'Cloudy' && <Cloud size={22} />}
-                </div>
-              </div>
-              <div className="mt-3">
-                <Select
-                  value={manualWeather}
-                  onChange={(val) => setManualWeather(val)}
-                  className="h-9 w-full rounded-xl text-xs font-bold"
-                  options={[
-                    { value: 'Clear', label: 'Clear' },
-                    { value: 'Rainy', label: 'Rainy' },
-                    { value: 'Cloudy', label: 'Cloudy' },
-                  ]}
-                />
-              </div>
-            </Card>
-
-            {/* Card 2: Temperature (Editable Stepper) */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Temperature
-                  </p>
-                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#F26E22]">
-                    {manualTemp}°C
-                  </h3>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50 text-[#F26E22]">
-                  <Thermometer size={22} />
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setManualTemp((t) => Math.max(18, t - 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 font-black text-slate-700 hover:bg-slate-100 active:scale-95"
-                >
-                  <Minus size={14} />
-                </button>
-                <div className="flex-1 text-center font-mono text-xs font-bold text-slate-500">
-                  Feels like {manualTemp + 2}°C
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setManualTemp((t) => Math.min(45, t + 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 font-black text-slate-700 hover:bg-slate-100 active:scale-95"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-            </Card>
-
-            {/* Card 3: Is Holiday? (Editable Toggle Switch) */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Is Holiday?
-                  </p>
-                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#092968]">
-                    {isHoliday ? 'Yes' : 'No'}
-                  </h3>
-                </div>
-                <div
-                  className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-                    isHoliday
-                      ? 'bg-purple-100 text-purple-600'
-                      : 'bg-slate-100 text-slate-400'
-                  }`}
-                >
-                  <Sparkles size={22} />
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600">
-                  {isHoliday ? 'Holiday Surge (+45 Pax)' : 'Regular Business Day'}
-                </span>
-                <Switch
-                  checked={isHoliday}
-                  onChange={(checked) => setIsHoliday(checked)}
-                />
-              </div>
-            </Card>
-
-            {/* Card 4: Date Details */}
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-xs transition-all hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Date Details
-                  </p>
-                  <h3 className="font-spaceGrotesk mt-0.5 text-xl font-black text-[#092968]">
-                    {currentDateForecast.dayOfWeek}
-                  </h3>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-[#092968]">
-                  <CalendarDays size={22} />
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <Tag
-                  color={currentDateForecast.dayType === 'Weekend' ? 'volcano' : 'cyan'}
-                  className="rounded-md font-bold"
-                >
-                  {currentDateForecast.dayType}
-                </Tag>
-                <span className="text-[11px] font-semibold text-slate-400">
-                  {currentDateForecast.formattedDate}
-                </span>
-              </div>
-            </Card>
-          </div>
-
-          {/* SECTION 3: MIDDLE SECTION - DEMANDING COUNT & BOM BUTTON */}
-          <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-[#092968] via-[#0c327a] to-[#12429c] p-6 text-white shadow-sm md:p-8">
-            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-lg bg-white/15 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider text-orange-300 backdrop-blur-md">
-                    AI Forecast Engine Output
-                  </span>
-                  <span className="rounded-lg bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold text-emerald-300 backdrop-blur-md">
-                    ✓ 79% Model Accuracy
-                  </span>
-                </div>
-                <h3 className="font-spaceGrotesk text-xs font-extrabold uppercase tracking-wider text-blue-200">
-                  Predicted Demanding Count
-                </h3>
-                <div className="flex items-baseline gap-3">
-                  <span className="font-spaceGrotesk font-mono text-5xl font-black text-white md:text-6xl">
-                    {currentDateForecast.demandingCount}
-                  </span>
-                  <span className="text-lg font-bold text-orange-400">
-                    Portions / Covers
-                  </span>
-                </div>
-                <p className="max-w-2xl text-xs text-blue-200">
-                  Estimated kitchen dining load for <span className="font-bold text-white">{currentDateForecast.formattedDate}</span> ({currentDateForecast.dayDetails}) based on {manualWeather.toLowerCase()} weather ({manualTemp}°C) and {isHoliday ? 'holiday demand' : 'regular dining day'}.
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleOpenForecastBOMDrawer}
-                  className="active:scale-98 flex h-13 items-center justify-center gap-2.5 rounded-2xl bg-[#F26E22] px-6 text-sm font-black text-white shadow-lg shadow-orange-950/30 transition-all hover:bg-[#d95a14]"
-                >
-                  <Boxes size={20} />
-                  <span>Check BOM for {currentDateForecast.demandingCount} Count</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveForecast}
-                  className="active:scale-98 flex h-13 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 text-xs font-bold text-white backdrop-blur-md transition-all hover:bg-white/20"
-                >
-                  <BookmarkPlus size={18} />
-                  <span>Save Forecast</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 4: LAST SECTION - SAVED DEMAND VALUES ROWS */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-            <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
-                  Saved Demand Values
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Historical and logged demand predictions with BOM recipe requirements
-                </p>
-              </div>
-              <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-[#092968]">
-                {savedDemandRecords.length} Saved Records
-              </span>
-            </div>
-
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full border-collapse text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                    <th className="px-4 py-3.5">Date</th>
-                    <th className="px-4 py-3.5">Weather</th>
-                    <th className="px-4 py-3.5 text-center">Temp</th>
-                    <th className="px-4 py-3.5">Is Holiday</th>
-                    <th className="px-4 py-3.5">Date Details</th>
-                    <th className="px-4 py-3.5 text-center">Demanded Count</th>
-                    <th className="px-4 py-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {savedDemandRecords.map((rec) => (
-                    <tr key={rec.id} className="transition-colors hover:bg-slate-50/80">
-                      <td className="px-4 py-3.5 font-bold text-[#092968]">
-                        {rec.date}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
-                          {rec.weatherCondition === 'Clear' && (
-                            <Sun size={15} className="text-amber-500" />
-                          )}
-                          {rec.weatherCondition === 'Rainy' && (
-                            <CloudRain size={15} className="text-blue-500" />
-                          )}
-                          {rec.weatherCondition === 'Cloudy' && (
-                            <Cloud size={15} className="text-slate-500" />
-                          )}
-                          {rec.weatherCondition}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-center font-mono font-bold text-slate-700">
-                        {rec.temperature}°C
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {rec.isHoliday.startsWith('Yes') ? (
-                          <Tag color="purple" className="rounded-md text-[11px] font-bold">
-                            Yes
-                          </Tag>
-                        ) : (
-                          <Tag
-                            color="default"
-                            className="rounded-md text-[11px] font-medium text-slate-500"
-                          >
-                            No
-                          </Tag>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 font-medium text-slate-600">
-                        {rec.dayDetails}
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        <span className="rounded-full bg-orange-100 px-3 py-1 font-mono text-xs font-black text-[#F26E22]">
-                          {rec.demandedCount} Pax
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <Button
-                          onClick={() => {
-                            const defaultDishes = [
-                              {
-                                itemId: 'F-005',
-                                name: 'Devilled Lagoon Prawns with Fried Rice',
-                                quantity: Math.round(rec.demandedCount * 0.35),
-                              },
-                              {
-                                itemId: 'F-008',
-                                name: 'Grilled Herb Butter Reef Fish',
-                                quantity: Math.round(rec.demandedCount * 0.25),
-                              },
-                              {
-                                itemId: 'F-001',
-                                name: 'Sri Lankan String Hoppers with Kiri Hodi',
-                                quantity: Math.round(rec.demandedCount * 0.25),
-                              },
-                              {
-                                itemId: 'F-006',
-                                name: 'Spicy Chicken Curry with Basmati',
-                                quantity: Math.round(rec.demandedCount * 0.15),
-                              },
-                            ];
-
-                            const calculatedResults: CalculatedOrderBOMFoodItem[] = defaultDishes.map((dish) => {
-                              const breakdown = calculateBOMBreakdown(dish.name, dish.quantity, dish.itemId);
-                              return {
-                                ItemId: dish.itemId,
-                                itemId: dish.itemId,
-                                itemName: dish.name,
-                                required_quantity: dish.quantity,
-                                rawMaterialDetails: breakdown.materials.map((m) => ({
-                                  materialId: m.materialId,
-                                  materialName: m.materialName,
-                                  category: m.category,
-                                  unitOfMeasure: m.unitOfMeasure,
-                                  qtyPerPerson: m.qtyPerPerson,
-                                  orderedQty: dish.quantity,
-                                  totalRequiredQty: m.totalRequiredQty,
-                                  quantityOnHand: m.quantityOnHand,
-                                  status: m.isShortage ? 'Shortage' : 'In Stock',
-                                  isShortage: m.isShortage,
-                                  shortageQty: m.shortageQty,
-                                })),
-                              };
-                            });
-
-                            setOrderBOMResults(calculatedResults);
-                            setSelectedBulkItem({
-                              dishName: `Saved Demand Recipe Breakdown (${rec.date})`,
-                              orderNumber: `SAVED-${rec.date.replace(/-/g, '').slice(4)}`,
-                              portionCount: rec.demandedCount,
-                              mealSession: 'SAVED_FORECAST',
-                              orderTicketId: `SAVED-${rec.id}`,
-                              items: defaultDishes,
-                            });
-                            setBomModalOpen(true);
-                          }}
-                          className="h-8 rounded-xl bg-[#092968] text-xs font-bold text-white hover:bg-[#0c3585]"
-                          icon={<Boxes size={13} />}
-                        >
-                          Check BOM
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* ========================================================================= */}
-          {/* DRAWER: FORECAST PORTION ALLOCATION & DISH SELECTION SIDEBAR */}
-          {/* ========================================================================= */}
-          <Drawer
-            title={
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 pr-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-[#F26E22]">
-                    <Boxes size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
-                      Forecast Portion Allocation & BOM
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Pick dishes and allocate portions for {currentDateForecast.demandingCount} predicted covers
-                    </p>
-                  </div>
-                </div>
-              </div>
-            }
-            placement="right"
-            width={620}
-            open={isForecastBOMDrawerOpen}
-            onClose={() => setIsForecastBOMDrawerOpen(false)}
-            footer={
-              <div className="flex items-center justify-between p-2">
-                <div>
-                  <p className="text-[11px] font-bold uppercase text-slate-400">
-                    Allocated Portions
-                  </p>
-                  <p className="font-mono text-base font-black text-[#092968]">
-                    {allocatedPortionsSum} / {currentDateForecast.demandingCount} Pax{' '}
-                    <span className="text-xs font-normal text-slate-400">
-                      ({selectedAllocatedCount} Dishes Selected)
-                    </span>
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setIsForecastBOMDrawerOpen(false)}
-                    className="h-11 rounded-xl px-4 font-bold"
-                  >
-                    Cancel
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={handleCalculateAllocatedBOM}
-                    className="active:scale-98 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-black text-white shadow-md hover:bg-[#d95a14]"
-                  >
-                    <Boxes size={16} />
-                    <span>Calculate BOM ({allocatedPortionsSum} Portions)</span>
-                  </button>
-                </div>
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              {/* Allocation Target Header Progress Box */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                      Target Predicted Demand
-                    </p>
-                    <p className="font-mono text-2xl font-black text-[#092968]">
-                      {currentDateForecast.demandingCount} Covers
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                      Currently Allocated
-                    </p>
-                    <p
-                      className={`font-mono text-2xl font-black ${
-                        allocatedPortionsSum === currentDateForecast.demandingCount
-                          ? 'text-emerald-600'
-                          : allocatedPortionsSum > currentDateForecast.demandingCount
-                            ? 'text-orange-600'
-                            : 'text-[#092968]'
-                      }`}
-                    >
-                      {allocatedPortionsSum} Pax
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
-                  <span className="text-xs font-bold text-slate-600">
-                    {allocatedPortionsSum === currentDateForecast.demandingCount ? (
-                      <span className="text-emerald-600">✓ Exactly matches forecast demand</span>
-                    ) : allocatedPortionsSum < currentDateForecast.demandingCount ? (
-                      <span className="text-blue-600">
-                        Remaining: {currentDateForecast.demandingCount - allocatedPortionsSum} portions
-                      </span>
-                    ) : (
-                      <span className="text-orange-600">
-                        Exceeds by +{allocatedPortionsSum - currentDateForecast.demandingCount} portions
-                      </span>
-                    )}
-                  </span>
-
-                  <Button
-                    size="small"
-                    onClick={handleAutoDistributeForecastPortions}
-                    className="rounded-lg bg-orange-100 text-[11px] font-black text-[#F26E22] hover:bg-orange-200"
-                  >
-                    Auto-Distribute ({currentDateForecast.demandingCount} Pax)
-                  </Button>
-                </div>
-              </div>
-
-              {/* 1. SEARCHABLE FOOD ITEM SELECTOR FROM SYSTEM */}
-              <div className="space-y-1.5 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs">
-                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
-                  Search & Pick Food Items from System:
-                </label>
-                <Select
-                  showSearch
-                  placeholder="Select food dish to add to allocation..."
-                  value={null}
-                  onChange={(val) => {
-                    const found = availableAllocationFoodItems.find(
-                      (f) => f.itemId === val,
-                    );
-                    if (found) {
-                      setForecastFoodAllocations((prev) => {
-                        if (prev.some((p) => p.itemId === val)) {
-                          return prev.map((p) =>
-                            p.itemId === val
-                              ? {
-                                  ...p,
-                                  isSelected: true,
-                                  portions: p.portions > 0 ? p.portions : 25,
-                                }
-                              : p,
-                          );
-                        }
-                        return [
-                          {
-                            itemId: found.itemId,
-                            name: found.name,
-                            category: found.category,
-                            unitPrice: found.unitPrice,
-                            portions: 25,
-                            isSelected: true,
-                          },
-                          ...prev,
-                        ];
-                      });
-                      successToast(`Added "${found.name}" to allocation list!`);
-                    }
-                  }}
-                  filterOption={(input, option) =>
-                    String(option?.label ?? '')
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
-                  className="h-11 w-full rounded-xl text-xs font-bold"
-                  options={availableAllocationFoodItems.map((f) => ({
-                    value: f.itemId,
-                    label: `${f.name} (${f.category}) - LKR ${f.unitPrice.toLocaleString()}`,
-                  }))}
-                />
-              </div>
-
-              {/* 2. ALLOCATED FOOD ITEMS LIST */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                    Allocated Menu Dishes ({forecastFoodAllocations.filter((f) => f.isSelected).length})
-                  </p>
-                  {forecastFoodAllocations.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setForecastFoodAllocations([])}
-                      className="text-[11px] font-bold text-rose-500 hover:underline"
-                    >
-                      Clear All
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-2.5 max-h-[48vh] overflow-y-auto pr-1">
-                  {forecastFoodAllocations.filter((f) => f.isSelected).length === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center">
-                      <Utensils size={32} className="text-slate-300" />
-                      <p className="mt-2 text-xs font-bold text-slate-600">
-                        No Food Items Selected Yet
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Pick items from the dropdown above or click Auto-Distribute to load recommended menu dishes.
-                      </p>
-                      <Button
-                        size="small"
-                        onClick={handleAutoDistributeForecastPortions}
-                        className="mt-3 rounded-lg bg-[#092968] text-[11px] font-bold text-white hover:bg-[#0c3585]"
-                      >
-                        Auto-Select Top Dishes ({currentDateForecast.demandingCount} Pax)
-                      </Button>
-                    </div>
-                  ) : (
-                    forecastFoodAllocations
-                      .filter((item) => item.isSelected)
-                      .map((item) => (
-                        <div
-                          key={item.itemId}
-                          className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/40 p-3.5 shadow-xs transition-all"
-                        >
-                          {/* Details */}
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-spaceGrotesk text-xs font-extrabold text-[#092968]">
-                              {item.name}
-                            </p>
-                            <div className="mt-0.5 flex items-center gap-2">
-                              <Tag color="orange" className="m-0 rounded-md text-[10px] font-bold">
-                                {item.category}
-                              </Tag>
-                              <span className="text-[11px] font-semibold text-slate-400">
-                                LKR {item.unitPrice.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Stepper + Remove */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setForecastFoodAllocations((prev) =>
-                                    prev.map((f) =>
-                                      f.itemId === item.itemId
-                                        ? { ...f, portions: Math.max(0, f.portions - 5) }
-                                        : f,
-                                    ),
-                                  );
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white font-black text-slate-700 hover:bg-slate-100 active:scale-95"
-                              >
-                                <Minus size={12} />
-                              </button>
-
-                              <InputNumber
-                                min={0}
-                                max={1000}
-                                value={item.portions}
-                                onChange={(val) => {
-                                  setForecastFoodAllocations((prev) =>
-                                    prev.map((f) =>
-                                      f.itemId === item.itemId
-                                        ? { ...f, portions: Number(val) || 0 }
-                                        : f,
-                                    ),
-                                  );
-                                }}
-                                className="w-18 font-mono text-center font-bold"
-                              />
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setForecastFoodAllocations((prev) =>
-                                    prev.map((f) =>
-                                      f.itemId === item.itemId
-                                        ? { ...f, portions: f.portions + 5 }
-                                        : f,
-                                    ),
-                                  );
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white font-black text-slate-700 hover:bg-slate-100 active:scale-95"
-                              >
-                                <Plus size={12} />
-                              </button>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setForecastFoodAllocations((prev) =>
-                                  prev.filter((f) => f.itemId !== item.itemId),
-                                );
-                              }}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                              title="Remove item"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </Drawer>
-        </div>
+        <AIDemandForecastingTab
+          foodItemsList={foodItemsList}
+          calculateBOMBreakdown={calculateBOMBreakdown}
+          setOrderBOMResults={setOrderBOMResults}
+          setSelectedBulkItem={setSelectedBulkItem}
+          setBomModalOpen={setBomModalOpen}
+        />
       )}
 
       {/* ========================================================================= */}
@@ -3571,31 +2496,54 @@ const ChefOperationsDesk: React.FC = () => {
           setOrderBOMResults([]);
         }}
         footer={[
-          selectedBulkItem?.orderTicketId ? (
+          <Button
+            key="close"
+            className="h-11 rounded-xl px-6 font-bold"
+            onClick={() => {
+              setBomModalOpen(false);
+              setSelectedBulkItem(null);
+            }}
+          >
+            Close
+          </Button>,
+
+          selectedBulkItem?.mealSession === 'FORECAST_ALLOCATION' ? (
             <Button
-              key="back-to-order"
-              className="h-11 rounded-xl px-5 font-bold"
-              onClick={() => {
-                setBomModalOpen(false);
-                setIsOrderModalOpen(true);
-              }}
-            >
-              Back to Order Details
-            </Button>
-          ) : (
-            <Button
-              key="close"
-              className="h-11 rounded-xl px-6 font-bold"
-              onClick={() => {
+              key="save-forecast"
+              loading={isSavingForecast}
+              onClick={async () => {
+                if (!selectedBulkItem?.forecastContext || !userData?.userId) return;
+                
+                // Format templateId array of strings or objects as requested
+                const templateIdArray = selectedBulkItem.items?.map(it => ({
+                  itemId: Number(it.itemId) || 0,
+                  portions: Number(it.quantity) || 0,
+                  name: it.name
+                })) || [];
+                
+                const payload = {
+                  templateId: JSON.stringify(templateIdArray),
+                  createdBy: userData.userId,
+                  targetDate: selectedBulkItem.forecastContext.dateStr,
+                  dateDetails: selectedBulkItem.forecastContext.dayDetails,
+                  temperature: selectedBulkItem.forecastContext.temperature,
+                  predictedGuests:
+                    selectedBulkItem.forecastContext.demandingCount ||
+                    selectedBulkItem.portionCount,
+                  weatherFeature: selectedBulkItem.forecastContext.weatherCondition,
+                  isHoliday: Boolean(selectedBulkItem.forecastContext.isHolidayBool || selectedBulkItem.forecastContext.isHoliday?.startsWith('Yes')),
+                };
+                
+                await addDemandForecastApi(payload);
                 setBomModalOpen(false);
                 setSelectedBulkItem(null);
               }}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#092968] px-6 text-xs font-bold text-white shadow-md hover:bg-[#0c3585] active:scale-95"
             >
-              Close
+              <CheckCircle2 size={16} />
+              <span>Save Forecast</span>
             </Button>
-          ),
-         
-          selectedBulkItem?.orderTicketId ? (
+          ) : selectedBulkItem?.orderTicketId ? (
             <Button
               key="confirm-start-cooking"
               disabled={isLoggingBOMAndStarting}
@@ -3633,7 +2581,7 @@ const ChefOperationsDesk: React.FC = () => {
         {isCalculatingOrderBOM ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Spin size="large" />
-            <p className="mt-4 font-spaceGrotesk text-sm font-black text-[#092968]">
+            <p className="font-spaceGrotesk mt-4 text-sm font-black text-[#092968]">
               Calculating Recipe BOM with Live Inventory...
             </p>
             <p className="text-xs text-slate-400">
@@ -3641,7 +2589,10 @@ const ChefOperationsDesk: React.FC = () => {
             </p>
           </div>
         ) : selectedBulkItem?.orderTicketId && orderBOMResults.length > 0 ? (
-          <div id="bom-calculation-modal-content" className="max-h-[68vh] space-y-4 overflow-y-auto pr-1 py-1">
+          <div
+            id="bom-calculation-modal-content"
+            className="max-h-[68vh] space-y-4 overflow-y-auto py-1 pr-1"
+          >
             {/* Top Summary Bar */}
             {orderBOMSummary && (
               <div className="grid grid-cols-3 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -3875,150 +2826,6 @@ const ChefOperationsDesk: React.FC = () => {
               </div>
             </div>
           )
-        )}
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODAL 2: AI BOM INVENTORY READINESS MODAL */}
-      {/* ========================================================================= */}
-      <Modal
-        title={
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-[#F26E22]">
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <h3 className="font-spaceGrotesk text-lg font-black text-[#092968]">
-                AI Predicted BOM Readiness Check
-              </h3>
-              <p className="text-xs text-slate-400">
-                {aiBOMCheckModal?.itemName} • Forecast Demand:{' '}
-                {aiBOMCheckModal?.predictedPortions} Portions
-              </p>
-            </div>
-          </div>
-        }
-        open={Boolean(aiBOMCheckModal)}
-        onCancel={() => setAiBOMCheckModal(null)}
-        footer={[
-          <Button
-            key="close"
-            className="h-11 rounded-xl px-6 font-bold"
-            onClick={() => setAiBOMCheckModal(null)}
-          >
-            Close
-          </Button>,
-          selectedAIPredictedBOM?.shortageMaterialsCount &&
-          selectedAIPredictedBOM.shortageMaterialsCount > 0 ? (
-            <button
-              key="req"
-              onClick={() => {
-                setIsRequisitionSent(true);
-                successToast('Auto Purchase Requisition sent to Store Manager!');
-              }}
-              disabled={isRequisitionSent}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-6 text-xs font-bold text-white shadow-md hover:bg-rose-700 active:scale-95 disabled:opacity-50"
-            >
-              <AlertTriangle size={16} />
-              <span>
-                {isRequisitionSent
-                  ? 'Requisition Sent ✓'
-                  : 'Auto-Generate Stock Requisition'}
-              </span>
-            </button>
-          ) : (
-            <button
-              key="ok"
-              onClick={() => setAiBOMCheckModal(null)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#092968] px-6 text-xs font-bold text-white shadow-md hover:bg-[#0c3585] active:scale-95"
-            >
-              <CheckCircle2 size={16} />
-              <span>Inventory Ready for Morning Prep</span>
-            </button>
-          ),
-        ]}
-        width={720}
-        centered
-      >
-        {selectedAIPredictedBOM && (
-          <div className="space-y-4 py-3">
-            {/* Warning or Success Alert Box */}
-            {selectedAIPredictedBOM.shortageMaterialsCount > 0 ? (
-              <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4">
-                <AlertTriangle size={24} className="mt-0.5 shrink-0 text-rose-600" />
-                <div>
-                  <h4 className="text-sm font-bold text-rose-900">
-                    Stock Insufficiency Detected for Tomorrow's Demand!
-                  </h4>
-                  <p className="mt-0.5 text-xs text-rose-700">
-                    {selectedAIPredictedBOM.shortageMaterialsCount} raw ingredients are
-                    below the required quantity. Please requisition replenishment today
-                    before dinner prep ends.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <CheckCircle2 size={24} className="mt-0.5 shrink-0 text-emerald-600" />
-                <div>
-                  <h4 className="text-sm font-bold text-emerald-900">
-                    Warehouse Inventory Fully Sufficient!
-                  </h4>
-                  <p className="mt-0.5 text-xs text-emerald-700">
-                    All required raw ingredients for {selectedAIPredictedBOM.portions}{' '}
-                    portions are available in stock.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Raw Material Breakdown Table */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-100 text-[11px] font-extrabold uppercase text-slate-600">
-                    <th className="px-3 py-2.5">Raw Material</th>
-                    <th className="px-3 py-2.5">Per Portion</th>
-                    <th className="px-3 py-2.5">Forecasted Total Required</th>
-                    <th className="px-3 py-2.5">Warehouse Stock on Hand</th>
-                    <th className="px-3 py-2.5 text-right">Readiness Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {selectedAIPredictedBOM.materials.map((mat, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-3 py-2.5 font-bold text-[#092968]">
-                        {mat.materialName}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-slate-500">
-                        {mat.qtyPerPerson} {mat.unitOfMeasure}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono font-black text-[#F26E22]">
-                        {mat.totalRequiredQty} {mat.unitOfMeasure}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono font-bold text-slate-800">
-                        {mat.quantityOnHand} {mat.unitOfMeasure}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        {mat.isShortage ? (
-                          <Tag color="error" className="rounded-md text-[10px] font-bold">
-                            ⚠️ Shortage (-{mat.shortageQty} {mat.unitOfMeasure})
-                          </Tag>
-                        ) : (
-                          <Tag
-                            color="success"
-                            className="rounded-md text-[10px] font-bold"
-                          >
-                            ✓ Sufficient
-                          </Tag>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         )}
       </Modal>
 
