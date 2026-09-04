@@ -1,13 +1,17 @@
-import { Badge, Card, Col, Divider, Row, Tag } from 'antd';
-import { CalendarCheck, Receipt, UserPlus } from 'lucide-react';
+import { Badge, Card, Col, Divider, Row, Tag, Button } from 'antd';
+import { CalendarCheck, Receipt, UserPlus, Printer, Download } from 'lucide-react';
 import type { Reservation } from '../../../types/services.interfaces';
 import reservationMutation from '../../../mutations/reservation.mutation';
 import userMutation from '../../../mutations/user.mutation';
 import roomMutation from '../../../mutations/room.mutation';
 import mealMutation from '../../../mutations/meal.mutation';
 import dayjs from 'dayjs';
+import { useRef, useEffect } from 'react';
+import { useReactToPrint } from 'react-to-print';
+import { QRCodeSVG } from 'qrcode.react';
+import html2pdf from 'html2pdf.js';
 
-export const ReservationPreview = ({ id }: { id: string }) => {
+export const ReservationPreview = ({ id, autoPrint, autoDownload }: { id: string, autoPrint?: boolean, autoDownload?: boolean }) => {
   const { getReservationByIdQuery } = reservationMutation();
   const { data: resResponse, isLoading } = getReservationByIdQuery(id);
   const { getAllUsersMutation } = userMutation();
@@ -19,6 +23,38 @@ export const ReservationPreview = ({ id }: { id: string }) => {
   const { data: mealsData } = getAllMealPlansMutation();
   const { data: roomTypes } = getAllRoomTypesMutation();
   const { data: foodItems } = getAllFoodItemsMutation();
+
+  const componentRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: componentRef,
+    documentTitle: `Reservation_Invoice_${id}`,
+  });
+
+  const handleDownload = () => {
+    if (componentRef.current) {
+      const opt:any = {
+        margin: 0.5,
+        filename: `Reservation_Invoice_${id}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+      html2pdf().from(componentRef.current).set(opt).save();
+    }
+  };
+
+  useEffect(() => {
+    if (autoPrint && !isLoading && resResponse?.data) {
+      setTimeout(() => {
+        handlePrint();
+      }, 500); // slight delay to ensure UI mounts before print
+    }
+    if (autoDownload && !isLoading && resResponse?.data) {
+      setTimeout(() => {
+        handleDownload();
+      }, 500);
+    }
+  }, [autoPrint, autoDownload, isLoading, resResponse, handlePrint]);
 
   if (isLoading) {
     return (
@@ -41,8 +77,30 @@ export const ReservationPreview = ({ id }: { id: string }) => {
   const mealCost = (mealPlan?.price || 0) * (reservation.guestCount || 1) * nights;
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 space-y-8 duration-500">
-      {/* Guest Card */}
+    <div className="animate-in fade-in slide-in-from-bottom-4 space-y-4 duration-500">
+      {/* Top Actions */}
+      <div className="flex justify-end pr-2 gap-3">
+        <Button 
+          type="primary" 
+          icon={<Printer size={16} />} 
+          onClick={handlePrint}
+          className="bg-[#0F2942] hover:bg-[#1a4b7c] border-none rounded-xl h-10 px-6 font-bold shadow-md"
+        >
+          Print
+        </Button>
+        <Button 
+          type="default" 
+          icon={<Download size={16} />} 
+          onClick={handleDownload}
+          className="border-[#0F2942] text-[#0F2942] hover:bg-[#0F2942] hover:text-white rounded-xl h-10 px-6 font-bold shadow-sm transition-all"
+        >
+          Download PDF
+        </Button>
+      </div>
+
+      {/* Printable Area */}
+      <div ref={componentRef} className="space-y-8 p-6 bg-white rounded-3xl print:p-8">
+        {/* Guest Card */}
       <Card className="rounded-[2rem] border-none bg-blue-50/50 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200">
@@ -217,6 +275,26 @@ export const ReservationPreview = ({ id }: { id: string }) => {
             </div>
           </div>
         </Card>
+      </div>
+
+      {/* QR Code Section */}
+      <div className="mt-8 flex flex-col items-center justify-center pt-8 border-t border-dashed border-gray-200 print:mt-12">
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">
+          Scan to Provide Feedback
+        </p>
+        <div className="p-2 bg-white rounded-2xl shadow-sm border border-gray-100">
+          <QRCodeSVG 
+            value={`${window.location.origin}/public-feedback?resId=${id}`} 
+            size={120} 
+            level="H" 
+            includeMargin 
+          />
+        </div>
+        <p className="text-xs text-gray-400 mt-3 max-w-[250px] text-center font-semibold">
+          We value your experience! Scan this QR code to rate your stay.
+        </p>
+      </div>
+
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Table,
   Tag,
@@ -37,6 +37,9 @@ import {
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import guestReviewMutation from '../../mutations/guestReview.mutation';
+import SockJS from 'sockjs-client';
+import { Stomp } from '@stomp/stompjs';
+import { successToast } from '../../components/common/Alert';
 
 const { Option } = Select;
 
@@ -76,6 +79,75 @@ const GuestFeedback: React.FC = () => {
   const { getAllGuestReviewsQuery, deleteGuestReviewMutation } = guestReviewMutation();
   const { data: response, isLoading, refetch, isRefetching } = getAllGuestReviewsQuery();
   const { mutate: deleteReview, isPending: isDeleting } = deleteGuestReviewMutation();
+
+  const audioEnabledRef = useRef(true);
+
+  // -------------------------------------------------------------------------
+  // WEBSOCKET: LIVE NEW REVIEW ALERTS
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    let wsBaseUrl = import.meta.env.VITE_API_URL;
+    try {
+      const url = new URL(apiUrl);
+      wsBaseUrl = `${url.protocol}//${url.host}`;
+    } catch (e) {
+      // ignore
+    }
+    const socket = new SockJS(`${wsBaseUrl}/ws`);
+    const stompClient = Stomp.over(socket);
+
+    // Disable excessive debug logs
+    stompClient.debug = () => {};
+
+    stompClient.connect(
+      {},
+      () => {
+        stompClient.subscribe('/topic/reviews', (message) => {
+          if (message.body) {
+
+            // Trigger Audio Alert
+            if (audioEnabledRef.current) {
+              try {
+                const AudioContext =
+                  window.AudioContext || (window as any).webkitAudioContext;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.type = 'sine';
+                // Higher pitch (C6) for review alerts
+                osc.frequency.setValueAtTime(1046.50, ctx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(
+                  0.00001,
+                  ctx.currentTime + 0.4,
+                );
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.4);
+              } catch (e) {
+                console.warn('Audio play blocked or unsupported', e);
+              }
+            }
+
+            const newReview = JSON.parse(message.body);
+            successToast(`New Guest Review Received from ${newReview.guest?.name || 'a Guest'}!`);
+            refetch();
+          }
+        });
+      },
+      (error: any) => {
+        console.error('WebSocket Error: ', error);
+      },
+    );
+
+    return () => {
+      if (stompClient && stompClient.connected) {
+        stompClient.disconnect(() => {});
+      }
+    };
+  }, [refetch]);
 
   const realReviews: GuestReviewItem[] = useMemo(() => {
     if (!response?.data) return [];

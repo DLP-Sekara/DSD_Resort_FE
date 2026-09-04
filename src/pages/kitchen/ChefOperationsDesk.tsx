@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import AIDemandForecastingTab from './components/AIDemandForecastingTab';
 import { Modal, Tag, Button, Input, Select, Card, Tooltip, Spin } from 'antd';
 import {
@@ -29,6 +29,8 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import SockJS from 'sockjs-client';
+import { Stomp } from '@stomp/stompjs';
 
 import kitchenMutation from '../../mutations/kitchen.mutation';
 import mealMutation from '../../mutations/meal.mutation';
@@ -296,6 +298,11 @@ const ChefOperationsDesk: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
 
+  const audioEnabledRef = useRef(audioEnabled);
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+  }, [audioEnabled]);
+
   // -------------------------------------------------------------------------
   // -------------------------------------------------------------------------
   // REACT QUERY DATA INTEGRATION
@@ -317,7 +324,8 @@ const ChefOperationsDesk: React.FC = () => {
   const { mutateAsync: calculateOrderBOMApi } = calculateOrderBOMMutation();
   const { mutateAsync: logBOMUsageApi } = logBOMUsageMutation();
   const { addDemandForecastMutation } = demandForecastMutation();
-  const { mutateAsync: addDemandForecastApi, isPending: isSavingForecast } = addDemandForecastMutation();
+  const { mutateAsync: addDemandForecastApi, isPending: isSavingForecast } =
+    addDemandForecastMutation();
 
   // State for Tab 2 BOM filter
   const [selectedBOMFilter, setSelectedBOMFilter] = useState<string>('ALL');
@@ -350,6 +358,70 @@ const ChefOperationsDesk: React.FC = () => {
     isKitchenPrepared: true,
   });
   const { mutateAsync: updateStatus } = updateRestaurantOrderStatusMutation();
+
+  // -------------------------------------------------------------------------
+  // WEBSOCKET: LIVE NEW ORDER ALERTS
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    let wsBaseUrl = import.meta.env.VITE_API_URL;
+    try {
+      const url = new URL(apiUrl);
+      wsBaseUrl = `${url.protocol}//${url.host}`;
+    } catch (e) {
+      // ignore
+    }
+    const socket = new SockJS(`${wsBaseUrl}/ws`);
+    const stompClient = Stomp.over(socket);
+
+    // Disable excessive debug logs
+    stompClient.debug = () => {};
+
+    stompClient.connect(
+      {},
+      () => {
+        stompClient.subscribe('/topic/orders', (message) => {
+          if (message.body) {
+
+            // Trigger Audio Alert
+            if (audioEnabledRef.current) {
+              try {
+                const AudioContext =
+                  window.AudioContext || (window as any).webkitAudioContext;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(
+                  0.00001,
+                  ctx.currentTime + 0.5,
+                );
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.5);
+              } catch (e) {
+                console.warn('Audio play blocked or unsupported', e);
+              }
+            }
+
+            refetchOrders();
+          }
+        });
+      },
+      (error: any) => {
+        console.error('WebSocket Error: ', error);
+      },
+    );
+
+    return () => {
+      if (stompClient && stompClient.connected) {
+        stompClient.disconnect(() => {});
+      }
+    };
+  }, [refetchOrders]);
 
   const rawMaterialsList: RawMaterial[] = useMemo(
     () => rawMaterialsRes?.data || [],
@@ -1342,8 +1414,6 @@ const ChefOperationsDesk: React.FC = () => {
     );
   };
 
-
-  console.log(userData);
   return (
     <div className="space-y-6 pb-12 font-sans text-slate-800">
       {/* ========================================================================= */}
@@ -2513,14 +2583,15 @@ const ChefOperationsDesk: React.FC = () => {
               loading={isSavingForecast}
               onClick={async () => {
                 if (!selectedBulkItem?.forecastContext || !userData?.userId) return;
-                
+
                 // Format templateId array of strings or objects as requested
-                const templateIdArray = selectedBulkItem.items?.map(it => ({
-                  itemId: Number(it.itemId) || 0,
-                  portions: Number(it.quantity) || 0,
-                  name: it.name
-                })) || [];
-                
+                const templateIdArray =
+                  selectedBulkItem.items?.map((it) => ({
+                    itemId: Number(it.itemId) || 0,
+                    portions: Number(it.quantity) || 0,
+                    name: it.name,
+                  })) || [];
+
                 const payload = {
                   templateId: JSON.stringify(templateIdArray),
                   createdBy: userData.userId,
@@ -2531,9 +2602,12 @@ const ChefOperationsDesk: React.FC = () => {
                     selectedBulkItem.forecastContext.demandingCount ||
                     selectedBulkItem.portionCount,
                   weatherFeature: selectedBulkItem.forecastContext.weatherCondition,
-                  isHoliday: Boolean(selectedBulkItem.forecastContext.isHolidayBool || selectedBulkItem.forecastContext.isHoliday?.startsWith('Yes')),
+                  isHoliday: Boolean(
+                    selectedBulkItem.forecastContext.isHolidayBool ||
+                      selectedBulkItem.forecastContext.isHoliday?.startsWith('Yes'),
+                  ),
                 };
-                
+
                 await addDemandForecastApi(payload);
                 setBomModalOpen(false);
                 setSelectedBulkItem(null);

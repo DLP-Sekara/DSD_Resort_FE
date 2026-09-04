@@ -26,7 +26,6 @@ import {
 } from 'antd';
 import {
   Plus,
-  Eye,
   Trash2,
   CalendarCheck,
   BedDouble,
@@ -35,6 +34,8 @@ import {
   Receipt,
   ArrowLeft,
   ArrowRight,
+  Printer,
+  Download,
 } from 'lucide-react';
 import reservationMutation from '../../mutations/reservation.mutation';
 import mealMutation from '../../mutations/meal.mutation';
@@ -61,6 +62,8 @@ const disabledDate = (current: dayjs.Dayjs) => {
 const Reservations = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerType, setDrawerType] = useState('add');
+  const [drawerAutoPrint, setDrawerAutoPrint] = useState(false);
+  const [drawerAutoDownload, setDrawerAutoDownload] = useState(false);
   const [selectedResId, setSelectedResId] = useState<string | null>(null);
   const [stepOneForm] = Form.useForm();
 
@@ -433,15 +436,33 @@ const Reservations = () => {
       key: 'actions',
       render: (_: any, record: Reservation) => (
         <Space size="middle">
-          <Button
-            type="text"
-            icon={<Eye size={18} className="text-gray-400 hover:text-blue-500" />}
-            onClick={() => {
-              setSelectedResId(record.resId || null);
-              setDrawerType('view');
-              setIsDrawerOpen(true);
-            }}
-          />
+          <Tooltip title="View & Print Invoice">
+            <Button
+              type="text"
+              icon={<Printer size={18} className="text-gray-400 hover:text-purple-500" />}
+              onClick={() => {
+                setSelectedResId(record.resId || null);
+                setDrawerType('view');
+                setDrawerAutoPrint(true);
+                setDrawerAutoDownload(false);
+                setIsDrawerOpen(true);
+              }}
+            />
+          </Tooltip>
+          
+          <Tooltip title="Download PDF">
+            <Button
+              type="text"
+              icon={<Download size={18} className="text-gray-400 hover:text-blue-500" />}
+              onClick={() => {
+                setSelectedResId(record.resId || null);
+                setDrawerType('view');
+                setDrawerAutoPrint(false);
+                setDrawerAutoDownload(true);
+                setIsDrawerOpen(true);
+              }}
+            />
+          </Tooltip>
 
           <Popconfirm
             title="Delete the reservation"
@@ -644,6 +665,8 @@ const Reservations = () => {
           setIsDrawerOpen(false);
           setSelectedResId(null);
           setIsExistingGuest(null);
+          setDrawerAutoPrint(false);
+          setDrawerAutoDownload(false);
         }}
         open={isDrawerOpen}
         className="custom-scrollbar rounded-l-[2.5rem]"
@@ -725,8 +748,8 @@ const Reservations = () => {
           )
         }
       >
-        {drawerType === 'view' ? (
-          <ReservationPreview id={selectedResId!} />
+        {drawerType === 'view' && selectedResId ? (
+          <ReservationPreview id={selectedResId} autoPrint={drawerAutoPrint} autoDownload={drawerAutoDownload} />
         ) : (
           <>
             {/* 1. Progress Tracker */}
