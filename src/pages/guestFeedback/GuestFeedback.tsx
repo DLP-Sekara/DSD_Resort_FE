@@ -11,6 +11,7 @@ import {
   Progress,
   Rate,
   Avatar,
+  Popconfirm,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -32,11 +33,13 @@ import {
   Clock,
   TrendingUp,
   Filter,
+  Trash2,
 } from 'lucide-react';
 import dayjs from 'dayjs';
+import guestReviewMutation from '../../mutations/guestReview.mutation';
 
 const { Option } = Select;
-const { RangePicker } = DatePicker;
+
 
 // ---------------------------------------------------------------------------
 // INTERFACES & TYPES
@@ -69,194 +72,82 @@ export interface GuestReviewItem {
   status: 'REVIEWED' | 'NEEDS_ACTION' | 'RESOLVED';
 }
 
-// ---------------------------------------------------------------------------
-// DUMMY GUEST FEEDBACK & REVIEWS DATA
-// ---------------------------------------------------------------------------
-const DUMMY_REVIEWS: GuestReviewItem[] = [
-  {
-    id: '1',
-    reviewId: 'REV-9021',
-    orderNumber: 'ORD-9E4832',
-    reviewerName: 'Michael Anderson',
-    reviewerEmail: 'm.anderson@example.com',
-    reviewerPhone: '+1 (555) 349-2810',
-    roomOrTable: 'Table #4 (Pool Terrace)',
-    date: '2026-08-27',
-    time: '01:30 PM',
-    timestamp: '2026-08-27T13:30:00',
-    rating: 5,
-    aiSentiment: 'POSITIVE',
-    aiConfidence: 97,
-    aiKeyTakeaway: 'Exceptional seafood freshness and prompt attentive service.',
-    reviewText:
-      'The Seafood Fried Rice and Devilled Lagoon Prawns were out of this world! Incredible burst of authentic spices, served steaming hot within 15 minutes. Server Samantha made our lunch unforgettable with her wine recommendation.',
-    suggestions: 'Please keep the spicy lagoon prawns permanently on the lunch special menu!',
-    staffMember: 'Samantha Wickramasinghe',
-    staffRole: 'Senior Waitress',
-    foodItems: [
-      { name: 'Sea Food Rice large', category: 'Main Dish', itemRating: 5 },
-      { name: 'Devilled Lagoon Prawns with Fried Rice', category: 'Seafood Special', itemRating: 5 },
-    ],
-    status: 'REVIEWED',
-  },
-  {
-    id: '2',
-    reviewId: 'REV-9022',
-    orderNumber: 'ORD-8B3109',
-    reviewerName: 'Dr. Elena Rostova',
-    reviewerEmail: 'elena.rostova@resortvip.org',
-    reviewerPhone: '+44 7911 123456',
-    roomOrTable: 'Villa Suite #204',
-    date: '2026-08-27',
-    time: '12:15 PM',
-    timestamp: '2026-08-27T12:15:00',
-    rating: 2,
-    aiSentiment: 'NEGATIVE',
-    aiConfidence: 92,
-    aiKeyTakeaway: 'Steak temperature inaccuracy and slow food delivery time.',
-    reviewText:
-      'The Grilled Herb Butter Reef Fish arrived lukewarm and we waited nearly 40 minutes after ordering appetizers. The server apologized politely, but the kitchen pacing was noticeably slow during lunch rush.',
-    suggestions: 'Improve kitchen-to-table coordination for hot entrees during peak rush hours.',
-    staffMember: 'Kasun Bandara',
-    staffRole: 'Food Server',
-    foodItems: [
-      { name: 'Grilled Herb Butter Reef Fish', category: 'Grill & Seafood', itemRating: 2 },
-      { name: 'Spaghetti Carbonara (Regular)', category: 'Pasta', itemRating: 3 },
-    ],
-    status: 'NEEDS_ACTION',
-  },
-  {
-    id: '3',
-    reviewId: 'REV-9023',
-    orderNumber: 'ORD-7A1194',
-    reviewerName: 'Rajesh & Priya Sharma',
-    reviewerEmail: 'rajesh.sharma@traveldiaries.in',
-    reviewerPhone: '+91 98200 12345',
-    roomOrTable: 'Table #12 (Garden Pavilion)',
-    date: '2026-08-26',
-    time: '08:45 PM',
-    timestamp: '2026-08-26T20:45:00',
-    rating: 5,
-    aiSentiment: 'POSITIVE',
-    aiConfidence: 99,
-    aiKeyTakeaway: 'Memorable anniversary dining experience with impeccable hospitality.',
-    reviewText:
-      'Celebrated our 10th anniversary tonight. Chef Kumara personally came out to explain the secret curry spices and Basmati preparation. Nimal provided five-star table care throughout our 3-course dinner. Outstanding luxury resort hospitality!',
-    suggestions: 'Offer a dessert sampler pairing with local Ceylon tea.',
-    staffMember: 'Nimal Jayasuriya',
-    staffRole: 'Head Waiter',
-    foodItems: [
-      { name: 'Spicy Chicken Curry with Basmati', category: 'Authentic Sri Lankan', itemRating: 5 },
-      { name: 'Sri Lankan String Hoppers with Kiri Hodi', category: 'Traditional', itemRating: 5 },
-    ],
-    status: 'REVIEWED',
-  },
-  {
-    id: '4',
-    reviewId: 'REV-9024',
-    orderNumber: 'ORD-6F9820',
-    reviewerName: 'Sarah Jenkins',
-    reviewerEmail: 's.jenkins@australiatravel.au',
-    reviewerPhone: '+61 412 345 678',
-    roomOrTable: 'Cabana #2 (Beachfront)',
-    date: '2026-08-26',
-    time: '02:00 PM',
-    timestamp: '2026-08-26T14:00:00',
-    rating: 4,
-    aiSentiment: 'POSITIVE',
-    aiConfidence: 89,
-    aiKeyTakeaway: 'Delicious flavors, slightly mild spice level than requested.',
-    reviewText:
-      'Very appetizing lunch by the beach. The Carbonara was creamy and rich. However, I asked for extra spicy sambol on the side which was forgotten on the first pass, but Kasun quickly brought it over with a smile.',
-    suggestions: 'Include gluten-free pasta options on the main menu.',
-    staffMember: 'Kasun Bandara',
-    staffRole: 'Food Server',
-    foodItems: [
-      { name: 'Spaghetti Carbonara (Regular)', category: 'Pasta', itemRating: 4 },
-      { name: 'Sea Food Rice large', category: 'Main Dish', itemRating: 4 },
-    ],
-    status: 'REVIEWED',
-  },
-  {
-    id: '5',
-    reviewId: 'REV-9025',
-    orderNumber: 'ORD-5C4391',
-    reviewerName: 'Hans & Greta Weber',
-    reviewerEmail: 'hans.weber@munich.de',
-    reviewerPhone: '+49 89 1234567',
-    roomOrTable: 'Table #9 (Main Dining Hall)',
-    date: '2026-08-25',
-    time: '09:15 AM',
-    timestamp: '2026-08-25T09:15:00',
-    rating: 5,
-    aiSentiment: 'POSITIVE',
-    aiConfidence: 96,
-    aiKeyTakeaway: 'Flawless breakfast buffet and warm Sri Lankan string hopper breakfast.',
-    reviewText:
-      'The morning string hoppers and coconut sambol breakfast was the highlight of our stay. Everything tasted fresh and authentic. Service by Dilshan was swift and very welcoming.',
-    suggestions: 'Extend morning breakfast hours on weekends until 11:00 AM.',
-    staffMember: 'Dilshan Perera',
-    staffRole: 'Breakfast Steward',
-    foodItems: [
-      { name: 'Sri Lankan String Hoppers with Kiri Hodi', category: 'Traditional', itemRating: 5 },
-    ],
-    status: 'REVIEWED',
-  },
-  {
-    id: '6',
-    reviewId: 'REV-9026',
-    orderNumber: 'ORD-4E7210',
-    reviewerName: 'Marcus Aurelius Vance',
-    reviewerEmail: 'marcus.vance@techcorp.io',
-    reviewerPhone: '+1 (415) 890-4321',
-    roomOrTable: 'Executive Villa #101',
-    date: '2026-08-24',
-    time: '07:30 PM',
-    timestamp: '2026-08-24T19:30:00',
-    rating: 1,
-    aiSentiment: 'NEGATIVE',
-    aiConfidence: 95,
-    aiKeyTakeaway: 'Allergy warning oversight and undercooked seafood.',
-    reviewText:
-      'We specifically noted a dairy restriction upon ordering, yet butter was added on top of the grilled fish. We had to send the plate back. Extremely disappointing for a resort of this standard.',
-    suggestions: 'Enforce strict digital tagging between server order tablets and kitchen prep monitors for allergen alerts.',
-    staffMember: 'Dinesh Fernando',
-    staffRole: 'Junior Server',
-    foodItems: [
-      { name: 'Grilled Herb Butter Reef Fish', category: 'Grill & Seafood', itemRating: 1 },
-    ],
-    status: 'NEEDS_ACTION',
-  },
-];
-
-// Distinct Staff Members & Food Items list for filters
-const STAFF_MEMBERS_LIST = [
-  'Samantha Wickramasinghe',
-  'Nimal Jayasuriya',
-  'Kasun Bandara',
-  'Dilshan Perera',
-  'Dinesh Fernando',
-];
-
-const FOOD_ITEMS_FILTER_LIST = [
-  'Sea Food Rice large',
-  'Devilled Lagoon Prawns with Fried Rice',
-  'Grilled Herb Butter Reef Fish',
-  'Spaghetti Carbonara (Regular)',
-  'Spicy Chicken Curry with Basmati',
-  'Sri Lankan String Hoppers with Kiri Hodi',
-];
-
 const GuestFeedback: React.FC = () => {
+  const { getAllGuestReviewsQuery, deleteGuestReviewMutation } = guestReviewMutation();
+  const { data: response, isLoading, refetch, isRefetching } = getAllGuestReviewsQuery();
+  const { mutate: deleteReview, isPending: isDeleting } = deleteGuestReviewMutation();
+
+  const realReviews: GuestReviewItem[] = useMemo(() => {
+    if (!response?.data) return [];
+    const reviews = response.data.map((r: any) => {
+      const formattedDate = r.date ? r.date.replace(/\./g, '-') : new Date().toISOString().split('T')[0];
+      const sentimentLabelUpper = r.sentimentLabel ? r.sentimentLabel.toUpperCase() : 'NEUTRAL';
+      const aiSentiment = ['POSITIVE', 'NEGATIVE', 'NEUTRAL'].includes(sentimentLabelUpper)
+        ? sentimentLabelUpper
+        : 'NEUTRAL';
+
+      const safeReviewId = String(r.reviewId || Math.random().toString(36).substring(2, 9));
+
+      return {
+        id: safeReviewId,
+        reviewId: `REV-${safeReviewId.substring(0, 4).toUpperCase()}`,
+        orderNumber: r.orderId || 'N/A',
+        reviewerName: r.guestId ? `Guest (${r.guestId.substring(0, 4)})` : 'Anonymous Guest',
+        roomOrTable: r.resId || 'General Area',
+        date: formattedDate,
+        time: 'N/A',
+        timestamp: formattedDate,
+        rating: r.starRating || 0,
+        aiSentiment: aiSentiment as 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL',
+        aiConfidence: r.nlpScore ? Math.round(r.nlpScore) : 0,
+        aiKeyTakeaway: r.reviewText,
+        reviewText: r.reviewText || 'No review text provided.',
+        suggestions: '',
+        staffMember: r.members && r.members.length > 0 ? r.members.join(', ') : 'Unassigned',
+        staffRole: 'Staff Member',
+        foodItems: r.food_items
+          ? r.food_items.map((f: string) => ({
+              name: f,
+              category: 'Ordered Item',
+              itemRating: r.starRating,
+            }))
+          : [],
+        status: 'REVIEWED',
+      };
+    });
+    
+    // Sort reviews by date descending (newest first)
+    return reviews.sort((a: GuestReviewItem, b: GuestReviewItem) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [response]);
+
+  const STAFF_MEMBERS_LIST = useMemo(() => {
+    const staffSet = new Set<string>();
+    realReviews.forEach((r) => {
+      if (r.staffMember && r.staffMember !== 'Unassigned') {
+        r.staffMember.split(', ').forEach((s) => staffSet.add(s));
+      }
+    });
+    return Array.from(staffSet);
+  }, [realReviews]);
+
+  const FOOD_ITEMS_FILTER_LIST = useMemo(() => {
+    const foodSet = new Set<string>();
+    realReviews.forEach((r) => {
+      if (r.foodItems) {
+        r.foodItems.forEach((f) => foodSet.add(f.name));
+      }
+    });
+    return Array.from(foodSet);
+  }, [realReviews]);
   // ---------------------------------------------------------------------------
   // FILTER STATES
   // ---------------------------------------------------------------------------
   const [selectedStaff, setSelectedStaff] = useState<string>('ALL');
   const [selectedFoodItem, setSelectedFoodItem] = useState<string>('ALL');
   const [selectedSentiment, setSelectedSentiment] = useState<string>('ALL');
-  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(
-    null,
-  );
+  const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(null);
   const [searchText, setSearchText] = useState<string>('');
 
   // ---------------------------------------------------------------------------
@@ -269,7 +160,7 @@ const GuestFeedback: React.FC = () => {
   // FILTERING LOGIC
   // ---------------------------------------------------------------------------
   const filteredReviews = useMemo(() => {
-    return DUMMY_REVIEWS.filter((item) => {
+    return realReviews.filter((item) => {
       // 1. Staff Filter
       if (selectedStaff !== 'ALL' && item.staffMember !== selectedStaff) {
         return false;
@@ -288,12 +179,10 @@ const GuestFeedback: React.FC = () => {
         return false;
       }
 
-      // 4. Date Range Filter
-      if (dateRange && dateRange[0] && dateRange[1]) {
+      // 4. Date Filter
+      if (selectedDate) {
         const itemDate = dayjs(item.timestamp);
-        const start = dateRange[0].startOf('day');
-        const end = dateRange[1].endOf('day');
-        if (itemDate.isBefore(start) || itemDate.isAfter(end)) {
+        if (!itemDate.isSame(selectedDate, 'day')) {
           return false;
         }
       }
@@ -313,7 +202,7 @@ const GuestFeedback: React.FC = () => {
 
       return true;
     });
-  }, [selectedStaff, selectedFoodItem, selectedSentiment, dateRange, searchText]);
+  }, [realReviews, selectedStaff, selectedFoodItem, selectedSentiment, selectedDate, searchText]);
 
   // ---------------------------------------------------------------------------
   // SUMMARY METRICS COMPUTATION
@@ -363,7 +252,7 @@ const GuestFeedback: React.FC = () => {
     setSelectedStaff('ALL');
     setSelectedFoodItem('ALL');
     setSelectedSentiment('ALL');
-    setDateRange(null);
+    setSelectedDate(null);
     setSearchText('');
   };
 
@@ -473,15 +362,34 @@ const GuestFeedback: React.FC = () => {
       title: 'Action',
       key: 'action',
       align: 'right',
-      width: 120,
+      width: 150,
       render: (_, record) => (
-        <Button
-          onClick={() => handleOpenReviewDetails(record)}
-          className="h-8 rounded-xl px-3 font-bold text-xs text-[#092968] border-slate-200 hover:border-[#092968] hover:text-[#092968] flex items-center gap-1.5 ml-auto"
-        >
-          <MessageCircle size={14} />
-          <span>View Details</span>
-        </Button>
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            onClick={() => handleOpenReviewDetails(record)}
+            className="h-8 rounded-xl px-3 font-bold text-xs text-[#092968] border-slate-200 hover:border-[#092968] hover:text-[#092968] flex items-center gap-1.5"
+          >
+            <MessageCircle size={14} />
+            <span>View Details</span>
+          </Button>
+          <Popconfirm
+            title="Delete this review?"
+            description="Are you sure you want to permanently delete this review?"
+            onConfirm={() => deleteReview(record.id)}
+            okText="Yes, Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true, loading: isDeleting }}
+            placement="topLeft"
+          >
+            <Button
+              danger
+              type="text"
+              className="h-8 w-8 rounded-xl p-0 flex items-center justify-center hover:bg-rose-50"
+            >
+              <Trash2 size={15} />
+            </Button>
+          </Popconfirm>
+        </div>
       ),
     },
   ];
@@ -513,11 +421,106 @@ const GuestFeedback: React.FC = () => {
           >
             Reset Filters
           </Button>
+          <Button
+            onClick={() => refetch()}
+            loading={isRefetching}
+            type="primary"
+            className="h-10 rounded-xl font-bold text-xs bg-[#092968]"
+          >
+            Refresh Data
+          </Button>
         </div>
       </div>
 
       {/* ----------------------------------------------------------------------- */}
-      {/* ABOVE TABLE: FINAL RESTAURANT REVIEW SUMMARY CARDS */}
+      {/* FILTERS TOOLBAR */}
+      {/* ----------------------------------------------------------------------- */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#092968]">
+            <Filter size={15} className="text-[#F26E22]" />
+            <span>Filter Reviews & Feedback</span>
+          </div>
+          <span className="text-xs font-semibold text-slate-400">
+            Showing <strong className="text-[#092968]">{filteredReviews.length}</strong> reviews
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* 1. Date Filter */}
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
+              Filter by Date
+            </label>
+            <DatePicker
+              value={selectedDate}
+              onChange={(date) => setSelectedDate(date)}
+              className="h-10 w-full rounded-xl"
+              format="YYYY-MM-DD"
+            />
+          </div>
+
+          {/* 2. Restaurant Staff Filter */}
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
+              Restaurant Staff Member
+            </label>
+            <Select
+              showSearch
+              placeholder="All Staff Members"
+              value={selectedStaff}
+              onChange={(val) => setSelectedStaff(val)}
+              className="h-10 w-full rounded-xl"
+            >
+              <Option value="ALL">All Staff Members ({STAFF_MEMBERS_LIST.length})</Option>
+              {STAFF_MEMBERS_LIST.map((staff) => (
+                <Option key={staff} value={staff}>
+                  {staff}
+                </Option>
+              ))}
+            </Select>
+          </div>
+
+          {/* 3. Food Items Filter */}
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
+              Ordered Food Item
+            </label>
+            <Select
+              showSearch
+              placeholder="All Food Items"
+              value={selectedFoodItem}
+              onChange={(val) => setSelectedFoodItem(val)}
+              className="h-10 w-full rounded-xl"
+            >
+              <Option value="ALL">All Food Items ({FOOD_ITEMS_FILTER_LIST.length})</Option>
+              {FOOD_ITEMS_FILTER_LIST.map((dish) => (
+                <Option key={dish} value={dish}>
+                  {dish}
+                </Option>
+              ))}
+            </Select>
+          </div>
+
+          {/* 4. Text Search Filter */}
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
+              Search Review Details
+            </label>
+            <Input
+              prefix={<Search size={14} className="text-slate-400" />}
+              placeholder="Search reviewer, comment, order #..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="h-10 rounded-xl"
+              allowClear
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ----------------------------------------------------------------------- */}
+      {/* SUMMARY CARDS */}
       {/* ----------------------------------------------------------------------- */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Average Rating */}
@@ -623,93 +626,6 @@ const GuestFeedback: React.FC = () => {
       </div>
 
       {/* ----------------------------------------------------------------------- */}
-      {/* FILTERS TOOLBAR */}
-      {/* ----------------------------------------------------------------------- */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#092968]">
-            <Filter size={15} className="text-[#F26E22]" />
-            <span>Filter Reviews & Feedback</span>
-          </div>
-          <span className="text-xs font-semibold text-slate-400">
-            Showing <strong className="text-[#092968]">{filteredReviews.length}</strong> reviews
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* 1. Date Range Filter */}
-          <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
-              Filter by Date Range
-            </label>
-            <RangePicker
-              value={dateRange}
-              onChange={(dates) => setDateRange(dates as any)}
-              className="h-10 w-full rounded-xl"
-              format="YYYY-MM-DD"
-            />
-          </div>
-
-          {/* 2. Restaurant Staff Filter */}
-          <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
-              Restaurant Staff Member
-            </label>
-            <Select
-              showSearch
-              placeholder="All Staff Members"
-              value={selectedStaff}
-              onChange={(val) => setSelectedStaff(val)}
-              className="h-10 w-full rounded-xl"
-            >
-              <Option value="ALL">All Staff Members ({STAFF_MEMBERS_LIST.length})</Option>
-              {STAFF_MEMBERS_LIST.map((staff) => (
-                <Option key={staff} value={staff}>
-                  {staff}
-                </Option>
-              ))}
-            </Select>
-          </div>
-
-          {/* 3. Food Items Filter */}
-          <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
-              Ordered Food Item
-            </label>
-            <Select
-              showSearch
-              placeholder="All Food Items"
-              value={selectedFoodItem}
-              onChange={(val) => setSelectedFoodItem(val)}
-              className="h-10 w-full rounded-xl"
-            >
-              <Option value="ALL">All Food Items ({FOOD_ITEMS_FILTER_LIST.length})</Option>
-              {FOOD_ITEMS_FILTER_LIST.map((dish) => (
-                <Option key={dish} value={dish}>
-                  {dish}
-                </Option>
-              ))}
-            </Select>
-          </div>
-
-          {/* 4. Text Search Filter */}
-          <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
-              Search Review Details
-            </label>
-            <Input
-              prefix={<Search size={14} className="text-slate-400" />}
-              placeholder="Search reviewer, comment, order #..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="h-10 rounded-xl"
-              allowClear
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ----------------------------------------------------------------------- */}
       {/* REVIEWS TABLE */}
       {/* ----------------------------------------------------------------------- */}
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -717,6 +633,7 @@ const GuestFeedback: React.FC = () => {
           <Table
             columns={columns}
             dataSource={filteredReviews}
+            loading={isLoading || isRefetching}
             rowKey="id"
             pagination={{
               pageSize: 8,

@@ -10,36 +10,44 @@ import {
   Result,
 } from 'antd';
 import { MessageSquareHeart, Sparkles } from 'lucide-react';
+import guestReviewMutation from '../../mutations/guestReview.mutation';
+import mealMutation from '../../mutations/meal.mutation';
+import type { GuestReviewDTO } from '../../types/guestReview.interfaces';
 
 const { TextArea } = Input;
 const { Option } = Select;
 
-// Distinct Staff Members & Food Items list (Fallback if no public API available)
-const STAFF_MEMBERS_LIST = [
-  'Samantha Wickramasinghe',
-  'Nimal Jayasuriya',
-  'Kasun Bandara',
-  'Dilshan Perera',
-  'Dinesh Fernando',
-];
-
-const FOOD_ITEMS_FILTER_LIST = [
-  'Sea Food Rice large',
-  'Devilled Lagoon Prawns with Fried Rice',
-  'Grilled Herb Butter Reef Fish',
-  'Spaghetti Carbonara (Regular)',
-  'Spicy Chicken Curry with Basmati',
-  'Sri Lankan String Hoppers with Kiri Hodi',
-];
-
 const PublicFeedback: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [form] = Form.useForm();
+  
+  const { addGuestReviewMutation } = guestReviewMutation();
+  const { mutate: addGuestReview, isPending } = addGuestReviewMutation();
+
+  const { getAllFoodItemsMutation } = mealMutation();
+  const { data: foodItemsResponse, isLoading: isFoodLoading } = getAllFoodItemsMutation();
+  const foodItems = foodItemsResponse?.data || [];
 
   const onFinish = (values: any) => {
     console.log('Feedback submitted:', values);
-    // TODO: Send data to actual backend endpoint when ready
-    setIsSubmitted(true);
+    const payload: GuestReviewDTO = {
+      guestId: null,
+      resId: null,
+      orderId: null,
+      reviewText: values.feedbackText,
+      nlpScore: null,
+      sentimentLabel: null,
+      starRating: values.rating,
+      date: values.date.format('YYYY.MM.DD'),
+      food_items: values.dishesBought || [],
+      members: values.staffMention ? [values.staffMention] : [],
+    };
+
+    addGuestReview(payload, {
+      onSuccess: () => {
+        setIsSubmitted(true);
+      },
+    });
   };
 
   if (isSubmitted) {
@@ -117,7 +125,7 @@ const PublicFeedback: React.FC = () => {
 
           <Form.Item
             name="dishesBought"
-            label={<span className="font-bold text-[#0F2942]">Dishes Enjoyed (Optional)</span>}
+            label={<span className="font-bold text-[#0F2942]">Dishes Enjoyed</span>}
           >
             <Select
               mode="multiple"
@@ -125,9 +133,10 @@ const PublicFeedback: React.FC = () => {
               size="large"
               className="rounded-xl"
               allowClear
+              loading={isFoodLoading}
             >
-              {FOOD_ITEMS_FILTER_LIST.map((dish) => (
-                <Option key={dish} value={dish}>{dish}</Option>
+              {foodItems.map((dish: any) => (
+                <Option key={dish.itemId || dish.name} value={dish.name}>{dish.name}</Option>
               ))}
             </Select>
           </Form.Item>
@@ -136,17 +145,7 @@ const PublicFeedback: React.FC = () => {
             name="staffMention"
             label={<span className="font-bold text-[#0F2942]">Mention Staff Members (Optional)</span>}
           >
-            <Select
-              mode="multiple"
-              placeholder="Select staff members"
-              size="large"
-              className="rounded-xl"
-              allowClear
-            >
-              {STAFF_MEMBERS_LIST.map((staff) => (
-                <Option key={staff} value={staff}>{staff}</Option>
-              ))}
-            </Select>
+            <Input placeholder="E.g., John Doe" size="large" className="rounded-xl" />
           </Form.Item>
 
           <Form.Item
@@ -174,6 +173,7 @@ const PublicFeedback: React.FC = () => {
               type="primary"
               htmlType="submit"
               size="large"
+              loading={isPending}
               className="w-full sm:w-auto px-12 bg-[#F26E22] hover:bg-[#D95C1A] border-none rounded-xl font-bold h-12 shadow-lg shadow-orange-200 transition-all hover:scale-105"
             >
               Submit Feedback
