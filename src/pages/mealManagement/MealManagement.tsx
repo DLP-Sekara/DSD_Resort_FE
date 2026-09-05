@@ -13,7 +13,7 @@ import {
   InputNumber,
   Switch,
 } from 'antd';
-import { Plus, Edit, Trash2, Utensils, Info, Coffee } from 'lucide-react';
+import { Plus, Edit, Trash2, Info, Coffee } from 'lucide-react';
 import ActionDialog from '../../components/common/ActionDialog';
 import CustomButton from '../../components/common/CustomButton';
 import mealMutation from '../../mutations/meal.mutation';
@@ -257,18 +257,7 @@ const MealManagement = () => {
           className="space-y-4"
           onFinish={handleMealPlanFinish}
         >
-          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-            <Utensils className="text-blue-500" size={24} />
-            <div>
-              <p className="text-xs font-bold uppercase text-blue-600">
-                Pricing Strategy
-              </p>
-              <p className="text-sm font-medium text-blue-900">
-                Rates are calculated per person per night.
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5">
+            <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5">
             <h4 className="mb-2 flex items-center gap-2 font-bold text-gray-700">
               <Info size={16} /> Important Note
             </h4>
@@ -357,11 +346,17 @@ const MealManagement = () => {
                     <span className="h-1 w-1 rounded-full bg-gray-300" />
                     <span>LKR {item?.unitPrice?.toLocaleString()}</span>
                     {item.isKitchenPrepared ? (
-                      <Tag color="orange" className="ml-1 rounded-md text-[10px] font-bold">
+                      <Tag
+                        color="orange"
+                        className="ml-1 rounded-md text-[10px] font-bold"
+                      >
                         Kitchen Prepared
                       </Tag>
                     ) : (
-                      <Tag color="default" className="ml-1 rounded-md text-[10px] font-semibold text-gray-500">
+                      <Tag
+                        color="default"
+                        className="ml-1 rounded-md text-[10px] font-semibold text-gray-500"
+                      >
                         Direct / Ready
                       </Tag>
                     )}
@@ -449,9 +444,7 @@ const MealManagement = () => {
 
             <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/70 p-3.5">
               <div>
-                <p className="text-xs font-bold text-[#092968]">
-                  Prepared in Kitchen?
-                </p>
+                <p className="text-xs font-bold text-[#092968]">Prepared in Kitchen?</p>
                 <p className="text-[11px] text-gray-400">
                   Enable if this item is cooked or prepared in the kitchen
                 </p>

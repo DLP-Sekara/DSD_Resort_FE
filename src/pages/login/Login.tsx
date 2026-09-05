@@ -21,11 +21,9 @@ const Login = () => {
       password: value.password,
     };
 
-    // Execute login mutation
     const response = await login(data);
 
 
-    // Redirect to dashboard on successful login
     if (response.success) {
       navigate('/dashboard', { replace: true });
     }

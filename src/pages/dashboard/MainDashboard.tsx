@@ -1,4 +1,4 @@
-import { Col, Row, Tag, Button, QRCode } from 'antd';
+import { Col, Row, Tag, Button } from 'antd';
 import { UserPlus, BedDouble, LogOut, ChevronRight, UtensilsCrossed, CalendarCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import roomMutation from '../../mutations/room.mutation';
@@ -87,7 +87,7 @@ const MainDashboard = () => {
       {/* 2. Quick Navigations & Recent Activity */}
       <Row gutter={[24, 24]}>
         {/* Recent Reservations */}
-        <Col xs={24} lg={9}>
+        <Col xs={24} lg={12}>
           <div className="rounded-[2rem] border border-gray-100 bg-white p-6 shadow-md h-full flex flex-col">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -129,7 +129,7 @@ const MainDashboard = () => {
         </Col>
 
         {/* Recent Restaurant Orders */}
-        <Col xs={24} lg={9}>
+        <Col xs={24} lg={12}>
           <div className="rounded-[2rem] border border-gray-100 bg-white p-6 shadow-md h-full flex flex-col">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -171,7 +171,7 @@ const MainDashboard = () => {
         </Col>
 
         {/* Public Feedback QR */}
-        <Col xs={24} lg={6}>
+        {/* <Col xs={24} lg={6}>
           <div className="rounded-[2rem] border border-gray-100 bg-gradient-to-br from-[#092968] to-indigo-800 p-6 shadow-md h-full flex flex-col items-center justify-center text-center relative overflow-hidden">
             <div className="relative z-10 flex flex-col items-center">
               <h3 className="text-xl font-bold text-white mb-1">Guest Feedback</h3>
@@ -196,11 +196,10 @@ const MainDashboard = () => {
               </Button>
             </div>
             
-            {/* Decorative circles */}
             <div className="absolute top-[-20%] left-[-20%] w-32 h-32 bg-blue-500 rounded-full mix-blend-screen filter blur-2xl opacity-30"></div>
             <div className="absolute bottom-[-20%] right-[-20%] w-32 h-32 bg-orange-500 rounded-full mix-blend-screen filter blur-2xl opacity-20"></div>
           </div>
-        </Col>
+        </Col> */}
       </Row>
 
       {/* 3. Live Room Status Grid */}

@@ -123,7 +123,7 @@ const MainSidebar = ({
       </div>
 
       {/* Navigation Items */}
-      <nav className="mt-6 flex-1 space-y-1.5 px-4 overflow-y-auto">
+      <nav className="mt-6 flex-1 space-y-1.5 px-4 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]">
         {allowedMenuItems.map((item, index) => {
           const isActive = location.pathname === item.path;
           return (

@@ -141,9 +141,7 @@ const KitchenManagement = () => {
     return matched?.userId || (userData as any)?.userId || staffResponse.data[0]?.userId || '';
   }, [staffResponse, userData]);
 
-  // ==========================================
   // 1. RAW MATERIAL SECTION HANDLERS & FILTERS
-  // ==========================================
   useEffect(() => {
     if (rawModalType === 'edit' && selectedRawMaterial) {
       rawForm.setFieldsValue({
@@ -366,9 +364,7 @@ const KitchenManagement = () => {
     },
   ];
 
-  // ==========================================
   // 2. FOOD ITEM SECTION HANDLERS & FILTERS
-  // ==========================================
   useEffect(() => {
     if (foodModalType === 'edit' && selectedFoodItem) {
       foodForm.setFieldsValue({
@@ -547,9 +543,7 @@ const KitchenManagement = () => {
     );
   }, [foodItemsResponse]);
 
-  // ==========================================
   // 3. BOM MANAGEMENT SECTION HANDLERS
-  // ==========================================
   const openCreateBOMDrawer = () => {
     bomForm.resetFields();
     bomForm.setFieldsValue({
@@ -780,9 +774,7 @@ const KitchenManagement = () => {
         </div>
       </div>
 
-      {/* ========================================================================= */}
       {/* 1. SUB-SECTION: RAW MATERIALS */}
-      {/* ========================================================================= */}
       {activeTab === 'RAW_MATERIALS' && (
         <div className="animate-in fade-in space-y-6 duration-300">
           {/* KPI Summary Cards */}
@@ -868,9 +860,10 @@ const KitchenManagement = () => {
 
               <Select
                 value={rawCategoryFilter}
-                onChange={(val) => setRawCategoryFilter(val)}
+                onChange={(val) => setRawCategoryFilter(val || 'ALL')}
                 className="h-11 w-52 rounded-xl"
                 placeholder="Filter by Category"
+                allowClear
               >
                 <Option value="ALL">All Categories</Option>
                 {RAW_MATERIAL_CATEGORIES.map((cat) => (
@@ -882,9 +875,10 @@ const KitchenManagement = () => {
 
               <Select
                 value={rawStockFilter}
-                onChange={(val) => setRawStockFilter(val)}
+                onChange={(val) => setRawStockFilter(val || 'ALL')}
                 className="h-11 w-44 rounded-xl"
                 placeholder="Filter by Stock"
+                allowClear
               >
                 <Option value="ALL">All Stock Status</Option>
                 <Option value="IN_STOCK">In Stock (&gt; 10)</Option>
@@ -932,9 +926,7 @@ const KitchenManagement = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
       {/* 2. SUB-SECTION: FOOD ITEMS */}
-      {/* ========================================================================= */}
       {activeTab === 'FOOD_ITEMS' && (
         <div className="animate-in fade-in space-y-6 duration-300">
           {/* KPI Summary Cards */}
@@ -1067,9 +1059,7 @@ const KitchenManagement = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
       {/* 3. SUB-SECTION: BOM TEMPLATES */}
-      {/* ========================================================================= */}
       {activeTab === 'BOM_MANAGEMENT' && (
         <div className="animate-in fade-in space-y-6 duration-300">
           {/* Header Description Card */}

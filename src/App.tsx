@@ -14,7 +14,7 @@ function App() {
       }}
       componentSize="middle"
     >
-      <ToastContainer position="bottom-center" autoClose={3000} />
+      <ToastContainer position="bottom-center" autoClose={3000} limit={1}/>
 
       <Routers />
     </ConfigProvider>

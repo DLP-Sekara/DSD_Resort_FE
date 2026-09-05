@@ -10,7 +10,7 @@ import {
   Badge,
   Popconfirm,
 } from 'antd';
-import { Plus, Edit, Trash2, Bed, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Bed, Info, Search } from 'lucide-react';
 import ActionDialog from '../../components/common/ActionDialog';
 import CustomButton from '../../components/common/CustomButton';
 import roomMutation from '../../mutations/room.mutation';
@@ -27,6 +27,9 @@ const Rooms = () => {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isRoomTypeDrawerOpen, setIsRoomTypeDrawerOpen] = useState(false);
   const [form] = Form.useForm();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string | null>(null);
 
   const {
     getAllRoomTypesMutation,
@@ -176,6 +179,12 @@ const Rooms = () => {
     }
   };
 
+  const filteredRooms = rooms?.data?.filter((room: Room) => {
+    const matchesSearch = String(room.roomNumber).toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = !selectedTypeFilter || selectedTypeFilter === 'all' || room.typeId === selectedTypeFilter;
+    return matchesSearch && matchesType;
+  });
+
   return (
     <div className="animate-in fade-in space-y-6 duration-500">
       {/* --- 1. Header & Actions --- */}
@@ -213,29 +222,33 @@ const Rooms = () => {
         </div>
       </div>
       {/* --- 2. Filter & Search Bar --- */}
-      {/* <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-white/50 p-2">
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-white/50 p-2">
         <Input
           prefix={<Search size={18} className="text-gray-400" />}
           placeholder="Search room number..."
           className="h-11 w-full shadow-sm md:w-80"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
         <Select
           defaultValue="all"
-          className="h-11 w-44 rounded-xl border-none shadow-sm"
+          className="h-11 w-52 rounded-xl border-none shadow-sm"
           allowClear
           placeholder="Select Room Type"
+          onChange={(value) => setSelectedTypeFilter(value)}
         >
+          <Option value="all">All Types</Option>
           {roomTypes?.data?.map((item: RoomType) => (
             <Option key={item.typeId} value={item.typeId}>
               {item.typeName}
             </Option>
           ))}
         </Select>
-      </div> */}
+      </div>
       {/* --- 3. Main Data Table --- */}
       <div className="overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-sm">
         <Table
-          dataSource={rooms?.data}
+          dataSource={filteredRooms}
           columns={columns}
           pagination={{ pageSize: 8 }}
           className="custom-table"
@@ -287,12 +300,24 @@ const Rooms = () => {
           </Form.Item>
 
           <Form.Item label="Room Type" name="type" rules={[{ required: true }]}>
-            <Select placeholder="Select Type" className="rounded-lg">
-              {roomTypes?.data?.map((item: RoomType) => (
-                <Option key={item.typeId} value={item.typeId}>
-                  {item.typeName}
-                </Option>
-              ))}
+            <Select
+              showSearch
+              placeholder="Select Type"
+              className="rounded-lg"
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                String(option?.children ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }
+            >
+              {[...(roomTypes?.data || [])]
+                .sort((a: RoomType, b: RoomType) => a.typeName.localeCompare(b.typeName))
+                .map((item: RoomType) => (
+                  <Option key={item.typeId} value={item.typeId}>
+                    {item.typeName}
+                  </Option>
+                ))}
             </Select>
           </Form.Item>
 
@@ -432,7 +457,11 @@ const Rooms = () => {
               />
             </Form.Item>
 
-            <Form.Item label="Max Occupancy" name="maxOccupancy" rules={[{ required: true }]}>
+            <Form.Item
+              label="Max Occupancy"
+              name="maxOccupancy"
+              rules={[{ required: true }]}
+            >
               <Input
                 placeholder="e.g. 2"
                 onKeyDown={(e) => {
