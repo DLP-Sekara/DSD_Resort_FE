@@ -1,5 +1,6 @@
 import { Divider } from 'antd';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Building } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import type {
   Reservation,
   Room,
@@ -49,19 +50,30 @@ export const Invoice = ({
       id="invoice-content"
       className="custom-scrollbar rounded-[2rem] border border-gray-100 bg-white p-8 shadow-sm print:border-none print:p-0 print:shadow-none"
     >
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h3 className="text-3xl font-black italic text-blue-600">OCEAN VIEW</h3>
-          <p className="text-[10px] uppercase tracking-widest text-gray-400">
-            Resort & Spa Galle
-          </p>
+      <div className="mb-8 flex items-start justify-between border-b border-gray-100 pb-6">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#092968] to-[#1a4499] text-white shadow-md">
+            <Building size={28} />
+          </div>
+          <div>
+            <h3 className="font-spaceGrotesk text-3xl font-black text-[#092968] uppercase tracking-tight">
+              DSD RESORT
+            </h3>
+            <p className="text-[10px] font-bold tracking-widest text-[#F26E22] uppercase mt-1">
+              Hotel & Spa Reservations
+            </p>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              Galle Road, Southern Province, Sri Lanka
+            </p>
+            <p className="text-[10px] text-gray-400">Tel: +94 91 223 4567 | info@dsdresort.com</p>
+          </div>
         </div>
         <div className="text-right">
-          <h4 className="text-xl font-bold uppercase tracking-tighter">Invoice</h4>
-          <p className="text-xs text-gray-500">
+          <h4 className="text-xl font-bold uppercase tracking-tighter text-[#092968]">Invoice</h4>
+          <p className="text-xs text-gray-500 font-semibold mt-1">
             No: {reservation.resId?.split('-')[0].toUpperCase()}
           </p>
-          <p className="text-xs text-gray-500">Date: {dayjs().format('YYYY-MM-DD')}</p>
+          <p className="text-xs text-gray-500">Date: {dayjs().format('DD MMM YYYY')}</p>
         </div>
       </div>
 
@@ -162,10 +174,34 @@ export const Invoice = ({
         </div>
       </div>
 
-      <div className="mt-12 flex items-center gap-2 border-t border-gray-50 pt-4 text-[10px] italic text-gray-400">
-        <CheckCircle2 size={14} className="text-green-500" />
-        This is a computer-generated invoice for {reservation.resId} and requires no
-        signature. Generated on {dayjs().format('MMMM D, YYYY h:mm A')}
+      <div className="mt-12 flex justify-between items-end border-t border-gray-100 pt-6">
+        <div className="flex flex-col items-start gap-1.5">
+          <p className="text-[11px] font-bold text-[#092968] uppercase">Scan to Leave a Review!</p>
+          <div className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <QRCodeSVG 
+              value={`${window.location.origin}/feedback?reservationId=${reservation.resId}`} 
+              size={64} 
+              level="M" 
+            />
+          </div>
+          <p className="text-[9px] text-gray-500 max-w-[180px] leading-tight">
+            We value your feedback to improve our service.
+          </p>
+        </div>
+        
+        <div className="flex flex-col text-right text-[10px] italic text-gray-400 gap-1.5">
+          <div className="flex items-center justify-end gap-1.5 text-emerald-600 font-bold not-italic text-xs">
+            <CheckCircle2 size={14} />
+            <span>Thank You For Staying With Us!</span>
+          </div>
+          <p>
+            This is a computer-generated invoice for {reservation.resId} and requires no signature.
+          </p>
+          <p>
+            Generated on {dayjs().format('MMMM D, YYYY h:mm A')}
+          </p>
+          <p className="text-[10px] text-gray-400">Powered by DSD Resort Management System</p>
+        </div>
       </div>
     </div>
   );

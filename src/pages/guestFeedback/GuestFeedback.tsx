@@ -291,6 +291,7 @@ const GuestFeedback: React.FC = () => {
         positivePct: 0,
         negativePct: 0,
         neutralPct: 0,
+        healthScore: 0,
       };
     }
 
@@ -310,6 +311,7 @@ const GuestFeedback: React.FC = () => {
       positivePct: Math.round((positive / total) * 100),
       negativePct: Math.round((negative / total) * 100),
       neutralPct: Math.round((neutral / total) * 100),
+      healthScore: Math.round((avg / 5) * 100),
     };
   }, [filteredReviews]);
 
@@ -682,17 +684,30 @@ const GuestFeedback: React.FC = () => {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Hospitality Health Score
               </p>
-              <h3 className="font-spaceGrotesk text-3xl font-black text-[#F26E22]">
-                94 / 100
+              <h3 className={`font-spaceGrotesk text-3xl font-black ${
+                summaryMetrics.healthScore >= 80 ? 'text-emerald-600' :
+                summaryMetrics.healthScore >= 50 ? 'text-[#F26E22]' : 'text-rose-600'
+              }`}>
+                {summaryMetrics.healthScore} / 100
               </h3>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-[#F26E22]">
+            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+              summaryMetrics.healthScore >= 80 ? 'bg-emerald-50 text-emerald-600' :
+              summaryMetrics.healthScore >= 50 ? 'bg-orange-50 text-[#F26E22]' : 'bg-rose-50 text-rose-600'
+            }`}>
               <HeartHandshake size={24} />
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+          <div className={`mt-3 flex items-center gap-1.5 text-xs font-bold ${
+            summaryMetrics.healthScore >= 80 ? 'text-emerald-600' :
+            summaryMetrics.healthScore >= 50 ? 'text-amber-600' : 'text-rose-600'
+          }`}>
             <TrendingUp size={14} />
-            <span>+4.2% higher satisfaction this month</span>
+            <span>
+              {summaryMetrics.healthScore >= 80 ? 'Excellent satisfaction based on reviews' :
+               summaryMetrics.healthScore >= 50 ? 'Moderate satisfaction based on reviews' :
+               'Poor satisfaction based on reviews'}
+            </span>
           </div>
         </Card>
       </div>

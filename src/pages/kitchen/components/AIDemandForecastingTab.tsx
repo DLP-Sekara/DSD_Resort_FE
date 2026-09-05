@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import dayjs from 'dayjs';
 
-import { successToast, errorToast } from '../../../components/common/Alert';
+import {  errorToast } from '../../../components/common/Alert';
 import type { CalculatedOrderBOMFoodItem } from '../../../types/kitchen.interfaces';
 import type { FoodItem } from '../../../types/services.interfaces';
 import type {
@@ -434,7 +434,7 @@ const AIDemandForecastingTab: React.FC<AIDemandForecastingTabProps> = ({
       ];
     });
 
-    successToast(`Evenly distributed exact ${totalPax} portions across dishes!`);
+    // successToast(`Evenly distributed exact ${totalPax} portions across dishes!`);
   };
 
   // Launch BOM Calculation Modal from Drawer with multi-dish separated breakdown
@@ -1051,7 +1051,7 @@ const AIDemandForecastingTab: React.FC<AIDemandForecastingTabProps> = ({
                     }
                     return nextList;
                   });
-                  successToast(`Added "${found.name}" to allocation list and auto-distributed!`);
+                  // successToast(`Added "${found.name}" to allocation list and auto-distributed!`);
                 }
               }}
               filterOption={(input, option) =>

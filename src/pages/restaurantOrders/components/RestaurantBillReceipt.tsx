@@ -2,6 +2,7 @@ import React from 'react';
 import { Tag, Divider } from 'antd';
 import { UtensilsCrossed, Calendar, User, Phone, CheckCircle2 } from 'lucide-react';
 import dayjs from 'dayjs';
+import { QRCodeSVG } from 'qrcode.react';
 
 export interface BillItem {
   itemId: string;
@@ -55,7 +56,7 @@ export const RestaurantBillReceipt: React.FC<RestaurantBillReceiptProps> = ({
           <UtensilsCrossed size={22} />
         </div>
         <h2 className="text-lg font-black tracking-tight text-[#092968] uppercase font-spaceGrotesk">
-          DSD Luxury Resort
+          DSD Resort
         </h2>
         <p className="text-[11px] font-semibold tracking-wider text-orange-600 uppercase">
           Restaurant & Fine Dining
@@ -212,8 +213,23 @@ export const RestaurantBillReceipt: React.FC<RestaurantBillReceiptProps> = ({
         </div>
       </div>
 
+      {/* QR Code for Guest Review */}
+      {!isConfirmationPreview && orderId && (
+        <div className="mt-4 flex flex-col items-center justify-center gap-1.5 border-t border-dashed border-gray-300 pt-4 text-center">
+          <p className="text-[11px] font-bold text-[#092968] uppercase">Scan to Leave a Review!</p>
+          <div className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <QRCodeSVG 
+              value={`${window.location.origin}/feedback?orderId=${orderId}`} 
+              size={64} 
+              level="M" 
+            />
+          </div>
+          <p className="text-[9px] text-gray-500 max-w-[180px] leading-tight mt-0.5">We value your feedback to improve our service.</p>
+        </div>
+      )}
+
       {/* Footer Notes */}
-      <div className="mt-5 text-center border-t border-dashed border-gray-300 pt-4 text-[11px] text-gray-400 space-y-1">
+      <div className="mt-5 text-center border-t border-dashed border-gray-300 pt-4 pb-12 text-[11px] text-gray-400 space-y-1">
         <div className="flex items-center justify-center gap-1.5 text-emerald-600 font-bold text-xs mb-1">
           <CheckCircle2 size={14} />
           <span>Thank You For Dining With Us!</span>

@@ -164,121 +164,7 @@ const INITIAL_BULK_REQUIREMENTS: BulkMealRequirement[] = [
   },
 ];
 
-const INITIAL_A_LA_CARTE_TICKETS: KDSOrderTicket[] = [
-  {
-    id: 'KDS-101',
-    orderNumber: '#ORD-2041',
-    orderSource: 'WALK_IN',
-    tableOrRoom: 'Table #04 (Garden Terrace)',
-    guestName: 'Mr. David Miller',
-    serverName: 'Waiter Roshan',
-    createdAt: dayjs().subtract(4, 'minute').toISOString(),
-    status: 'PENDING',
-    priority: 'URGENT',
-    specialInstructions: 'Make it extra spicy. No coriander.',
-    items: [
-      {
-        itemId: 'F-005',
-        name: 'Devilled Lagoon Prawns with Fried Rice',
-        quantity: 2,
-        isKitchenPrepared: true,
-      },
-      {
-        itemId: 'F-004',
-        name: 'Freshly Brewed Ceylon Milk Tea',
-        quantity: 2,
-        isKitchenPrepared: false,
-      },
-    ],
-  },
-  {
-    id: 'KDS-102',
-    orderNumber: '#ORD-2042',
-    orderSource: 'ROOM_SERVICE',
-    tableOrRoom: 'Villa 108 (Ocean Front)',
-    guestName: 'Mrs. Sarah Jenkins',
-    serverName: 'In-Room Dining Asanka',
-    createdAt: dayjs().subtract(14, 'minute').toISOString(),
-    startedCookingAt: dayjs().subtract(8, 'minute').toISOString(),
-    status: 'PREPARING',
-    priority: 'VIP',
-    specialInstructions: 'VIP Guest. Separate chili paste on side.',
-    items: [
-      {
-        itemId: 'F-008',
-        name: 'Grilled Herb Butter Reef Fish',
-        quantity: 2,
-        isKitchenPrepared: true,
-      },
-      {
-        itemId: 'F-007',
-        name: 'Dhal Curry in Coconut Milk',
-        quantity: 1,
-        isKitchenPrepared: true,
-      },
-      {
-        itemId: 'F-010',
-        name: 'Garlic Butter Naan',
-        quantity: 3,
-        isKitchenPrepared: true,
-      },
-    ],
-  },
-  {
-    id: 'KDS-103',
-    orderNumber: '#ORD-2043',
-    orderSource: 'TABLE_DINE_IN',
-    tableOrRoom: 'Table #12 (Main Hall)',
-    guestName: 'Fernando Family (4 Pax)',
-    serverName: 'Steward Kasun',
-    createdAt: dayjs().subtract(22, 'minute').toISOString(),
-    startedCookingAt: dayjs().subtract(15, 'minute').toISOString(),
-    readyAt: dayjs().subtract(2, 'minute').toISOString(),
-    status: 'READY',
-    priority: 'NORMAL',
-    specialInstructions: 'Serve hot immediately.',
-    items: [
-      {
-        itemId: 'F-001',
-        name: 'Sri Lankan String Hoppers Feast',
-        quantity: 4,
-        isKitchenPrepared: true,
-      },
-      {
-        itemId: 'F-006',
-        name: 'Spicy Chicken Curry with Basmati',
-        quantity: 2,
-        isKitchenPrepared: true,
-      },
-    ],
-  },
-  {
-    id: 'KDS-104',
-    orderNumber: '#ORD-2044',
-    orderSource: 'POOL_BAR',
-    tableOrRoom: 'Pool Cabana #03',
-    guestName: 'Alex & Elena',
-    serverName: 'Barman Suresh',
-    createdAt: dayjs().subtract(2, 'minute').toISOString(),
-    status: 'PENDING',
-    priority: 'NORMAL',
-    specialInstructions: 'Quick prep requested.',
-    items: [
-      {
-        itemId: 'F-005',
-        name: 'Devilled Lagoon Prawns with Fried Rice',
-        quantity: 1,
-        isKitchenPrepared: true,
-      },
-      {
-        itemId: 'F-002',
-        name: 'Scrambled Farm Eggs & Sausages',
-        quantity: 1,
-        isKitchenPrepared: true,
-      },
-    ],
-  },
-];
+
 
 const ChefOperationsDesk: React.FC = () => {
   const { userData } = useAuth();
@@ -303,7 +189,7 @@ const ChefOperationsDesk: React.FC = () => {
     audioEnabledRef.current = audioEnabled;
   }, [audioEnabled]);
 
-  // -------------------------------------------------------------------------
+
   // -------------------------------------------------------------------------
   // REACT QUERY DATA INTEGRATION
   // -------------------------------------------------------------------------
@@ -439,9 +325,7 @@ const ChefOperationsDesk: React.FC = () => {
   // -------------------------------------------------------------------------
   // TAB 1: KDS ORDERS STATE & TICKERS
   // -------------------------------------------------------------------------
-  const [kdsTickets, setKdsTickets] = useState<KDSOrderTicket[]>(
-    INITIAL_A_LA_CARTE_TICKETS,
-  );
+  const [kdsTickets, setKdsTickets] = useState<KDSOrderTicket[]>([]);
   const [bulkRequirements] = useState<BulkMealRequirement[]>(INITIAL_BULK_REQUIREMENTS);
   const [selectedKdsTicket, setSelectedKdsTicket] = useState<KDSOrderTicket | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
@@ -456,7 +340,7 @@ const ChefOperationsDesk: React.FC = () => {
 
   // Merge & sync external restaurant orders into KDS tickets if available
   useEffect(() => {
-    if (ordersRes?.data && Array.isArray(ordersRes.data) && ordersRes.data.length > 0) {
+    if (ordersRes?.data && Array.isArray(ordersRes.data)) {
       // Filter to only include orders containing kitchen-prepared food items
       const kitchenOrders = ordersRes.data.filter((ord: any) => {
         const orderDetails = ord.orderDetails || ord.restaurantOrderDetails || [];
@@ -1550,7 +1434,7 @@ const ChefOperationsDesk: React.FC = () => {
 
               <button
                 onClick={() => setKdsSubTab('BULK_MEALS')}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all sm:flex-initial sm:text-sm ${
+                className={`hidden flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all sm:flex-initial sm:text-sm ${
                   kdsSubTab === 'BULK_MEALS'
                     ? 'bg-[#092968] text-white shadow'
                     : 'text-slate-600 hover:text-[#092968]'
@@ -1612,42 +1496,44 @@ const ChefOperationsDesk: React.FC = () => {
                         className="cursor-pointer rounded-2xl border-l-4 border-slate-200 border-l-amber-500 bg-white p-0 shadow-sm transition-all hover:border-amber-400 hover:shadow-md"
                       >
                         {/* Ticket Header */}
-                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-4 pb-2.5">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-spaceGrotesk text-base font-black text-[#092968]">
+                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-3 pb-2.5 sm:p-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-spaceGrotesk truncate text-sm font-black text-[#092968] sm:text-base">
                                 {ticket.orderNumber}
                               </span>
                               {ticket.priority === 'URGENT' ||
                               ticket.priority === 'VIP' ? (
-                                <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-black text-rose-700">
+                                <span className="shrink-0 rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-black text-rose-700">
                                   {ticket.priority}
                                 </span>
                               ) : (
-                                <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                <span className="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
                                   PENDING
                                 </span>
                               )}
                             </div>
-                            <p className="mt-0.5 text-xs font-bold text-slate-700">
+                            <p className="mt-0.5 truncate text-xs font-bold text-slate-700">
                               {ticket.tableOrRoom}
                             </p>
-                            <p className="text-[11px] text-slate-400">
+                            <p className="truncate text-[11px] text-slate-400">
                               Server: {ticket.serverName}
                             </p>
                           </div>
-                          {getElapsedBadge(ticket.createdAt, ticket.status)}
+                          <div className="shrink-0">
+                            {getElapsedBadge(ticket.createdAt, ticket.status)}
+                          </div>
                         </div>
 
                         {/* Order Summary Box (Clickable to view items) */}
-                        <div className="px-4 py-3">
-                          <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#092968] text-xs font-bold text-white">
-                                <Utensils size={15} />
+                        <div className="px-3 py-3 sm:px-4">
+                          <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2 sm:p-2.5">
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#092968] text-xs font-bold text-white sm:h-8 sm:w-8">
+                                <Utensils size={14} />
                               </div>
-                              <div>
-                                <p className="text-xs font-black text-slate-800">
+                              <div className="min-w-0">
+                                <p className="truncate text-[11px] font-black text-slate-800 sm:text-xs">
                                   {ticket.items.length}{' '}
                                   {ticket.items.length === 1 ? 'Dish' : 'Dishes'} (
                                   {ticket.items.reduce(
@@ -1656,7 +1542,7 @@ const ChefOperationsDesk: React.FC = () => {
                                   )}{' '}
                                   Portions)
                                 </p>
-                                <p className="text-[11px] font-semibold text-slate-400">
+                                <p className="truncate text-[10px] font-semibold text-slate-400 sm:text-[11px]">
                                   Total: LKR{' '}
                                   {Number(ticket.totalAmount || 0).toLocaleString(
                                     'en-US',
@@ -1665,24 +1551,24 @@ const ChefOperationsDesk: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            <span className="flex items-center gap-1 rounded-lg bg-orange-50 px-2 py-1 text-[11px] font-bold text-[#F26E22]">
-                              <Eye size={12} /> View Items
+                            <span className="flex shrink-0 items-center gap-1 rounded-lg bg-orange-50 px-2 py-1 text-[10px] font-bold text-[#F26E22] sm:text-[11px]">
+                              <Eye size={12} /> <span className="hidden sm:inline">View Items</span>
                             </span>
                           </div>
                         </div>
 
                         {/* Tablet Touch Action Button */}
-                        <div className="p-4 pt-0">
+                        <div className="p-3 pt-0 sm:p-4 sm:pt-0">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedKdsTicket(ticket);
                               setIsOrderModalOpen(true);
                             }}
-                            className="active:scale-98 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#F26E22] text-xs font-extrabold text-white shadow-md transition-all hover:bg-[#d95a14]"
+                            className="active:scale-98 flex h-auto min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#F26E22] p-2 text-center text-xs font-extrabold leading-tight text-white shadow-md transition-all hover:bg-[#d95a14]"
                           >
-                            <Flame size={16} />
-                            <span>Start Cooking (Review & BOM)</span>
+                            <Flame size={16} className="shrink-0" />
+                            <span>Start Cooking <br className="sm:hidden" />(Review & BOM)</span>
                           </button>
                         </div>
                       </Card>
@@ -1735,35 +1621,37 @@ const ChefOperationsDesk: React.FC = () => {
                         className="cursor-pointer rounded-2xl border-l-4 border-orange-200 border-l-[#F26E22] bg-white p-0 shadow-sm transition-all hover:border-[#F26E22] hover:shadow-md"
                       >
                         {/* Ticket Header */}
-                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-4 pb-2.5">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-spaceGrotesk text-base font-black text-[#092968]">
+                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-3 pb-2.5 sm:p-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-spaceGrotesk truncate text-sm font-black text-[#092968] sm:text-base">
                                 {ticket.orderNumber}
                               </span>
-                              <span className="flex items-center gap-1 rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-[#F26E22]">
+                              <span className="flex shrink-0 items-center gap-1 rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-[#F26E22]">
                                 <Flame size={10} /> Cooking
                               </span>
                             </div>
-                            <p className="mt-0.5 text-xs font-bold text-slate-700">
+                            <p className="mt-0.5 truncate text-xs font-bold text-slate-700">
                               {ticket.tableOrRoom}
                             </p>
-                            <p className="text-[11px] text-slate-400">
+                            <p className="truncate text-[11px] text-slate-400">
                               Server: {ticket.serverName}
                             </p>
                           </div>
-                          {getElapsedBadge(ticket.createdAt, ticket.status)}
+                          <div className="shrink-0">
+                            {getElapsedBadge(ticket.createdAt, ticket.status)}
+                          </div>
                         </div>
 
                         {/* Order Summary Box (Clickable to view items) */}
-                        <div className="px-4 py-3">
-                          <div className="flex items-center justify-between rounded-xl border border-orange-100 bg-orange-50/50 p-2.5">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F26E22] text-xs font-bold text-white">
-                                <Flame size={15} />
+                        <div className="px-3 py-3 sm:px-4">
+                          <div className="flex items-center justify-between gap-2 rounded-xl border border-orange-100 bg-orange-50/50 p-2 sm:p-2.5">
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F26E22] text-xs font-bold text-white sm:h-8 sm:w-8">
+                                <Flame size={14} />
                               </div>
-                              <div>
-                                <p className="text-xs font-black text-slate-800">
+                              <div className="min-w-0">
+                                <p className="truncate text-[11px] font-black text-slate-800 sm:text-xs">
                                   {ticket.items.length}{' '}
                                   {ticket.items.length === 1 ? 'Dish' : 'Dishes'} (
                                   {ticket.items.reduce(
@@ -1772,7 +1660,7 @@ const ChefOperationsDesk: React.FC = () => {
                                   )}{' '}
                                   Portions)
                                 </p>
-                                <p className="text-[11px] font-semibold text-slate-400">
+                                <p className="truncate text-[10px] font-semibold text-slate-400 sm:text-[11px]">
                                   Total: LKR{' '}
                                   {Number(ticket.totalAmount || 0).toLocaleString(
                                     'en-US',
@@ -1781,23 +1669,23 @@ const ChefOperationsDesk: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            <span className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-bold text-[#092968]">
-                              <Eye size={12} /> View Items
+                            <span className="flex shrink-0 items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-[10px] font-bold text-[#092968] sm:text-[11px]">
+                              <Eye size={12} /> <span className="hidden sm:inline">View Items</span>
                             </span>
                           </div>
                         </div>
 
                         {/* Tablet Touch Action Button */}
-                        <div className="p-4 pt-0">
+                        <div className="p-3 pt-0 sm:p-4 sm:pt-0">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleAdvanceKdsStatus(ticket.id, 'READY');
                             }}
-                            className="active:scale-98 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#092968] text-xs font-extrabold text-white shadow-md transition-all hover:bg-[#0c3585]"
+                            className="active:scale-98 flex h-auto min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#092968] p-2 text-center text-xs font-extrabold leading-tight text-white shadow-md transition-all hover:bg-[#0c3585]"
                           >
-                            <CheckCircle2 size={16} className="text-emerald-400" />
-                            <span>Mark as Plated & Ready</span>
+                            <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
+                            <span>Mark as Plated <br className="sm:hidden" />& Ready</span>
                           </button>
                         </div>
                       </Card>
@@ -1850,35 +1738,37 @@ const ChefOperationsDesk: React.FC = () => {
                         className="cursor-pointer rounded-2xl border-l-4 border-emerald-200 border-l-emerald-500 bg-white p-0 shadow-sm transition-all hover:border-emerald-500 hover:shadow-md"
                       >
                         {/* Ticket Header */}
-                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-4 pb-2.5">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-spaceGrotesk text-base font-black text-[#092968]">
+                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-3 pb-2.5 sm:p-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-spaceGrotesk truncate text-sm font-black text-[#092968] sm:text-base">
                                 {ticket.orderNumber}
                               </span>
-                              <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black text-emerald-700">
+                              <span className="shrink-0 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black text-emerald-700">
                                 Plated
                               </span>
                             </div>
-                            <p className="mt-0.5 text-xs font-bold text-slate-700">
+                            <p className="mt-0.5 truncate text-xs font-bold text-slate-700">
                               {ticket.tableOrRoom}
                             </p>
-                            <p className="text-[11px] text-slate-400">
+                            <p className="truncate text-[11px] text-slate-400">
                               Server: {ticket.serverName}
                             </p>
                           </div>
-                          {getElapsedBadge(ticket.createdAt, ticket.status)}
+                          <div className="shrink-0">
+                            {getElapsedBadge(ticket.createdAt, ticket.status)}
+                          </div>
                         </div>
 
                         {/* Order Summary Box (Clickable to view items) */}
-                        <div className="px-4 py-3">
-                          <div className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 p-2.5">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-xs font-bold text-white">
-                                <CheckCircle2 size={15} />
+                        <div className="px-3 py-3 sm:px-4">
+                          <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/50 p-2 sm:p-2.5">
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-xs font-bold text-white sm:h-8 sm:w-8">
+                                <CheckCircle2 size={14} />
                               </div>
-                              <div>
-                                <p className="text-xs font-black text-slate-800">
+                              <div className="min-w-0">
+                                <p className="truncate text-[11px] font-black text-slate-800 sm:text-xs">
                                   {ticket.items.length}{' '}
                                   {ticket.items.length === 1 ? 'Dish' : 'Dishes'} (
                                   {ticket.items.reduce(
@@ -1887,7 +1777,7 @@ const ChefOperationsDesk: React.FC = () => {
                                   )}{' '}
                                   Portions)
                                 </p>
-                                <p className="text-[11px] font-semibold text-slate-400">
+                                <p className="truncate text-[10px] font-semibold text-slate-400 sm:text-[11px]">
                                   Total: LKR{' '}
                                   {Number(ticket.totalAmount || 0).toLocaleString(
                                     'en-US',
@@ -1896,23 +1786,23 @@ const ChefOperationsDesk: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            <span className="flex items-center gap-1 rounded-lg bg-emerald-100/60 px-2 py-1 text-[11px] font-bold text-emerald-700">
-                              <Eye size={12} /> View Items
+                            <span className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-100/60 px-2 py-1 text-[10px] font-bold text-emerald-700 sm:text-[11px]">
+                              <Eye size={12} /> <span className="hidden sm:inline">View Items</span>
                             </span>
                           </div>
                         </div>
 
                         {/* Tablet Touch Action Button */}
-                        <div className="p-4 pt-0">
+                        <div className="p-3 pt-0 sm:p-4 sm:pt-0">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleAdvanceKdsStatus(ticket.id, 'SERVED');
                             }}
-                            className="active:scale-98 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-xs font-extrabold text-white shadow-md transition-all hover:bg-emerald-700"
+                            className="active:scale-98 flex h-auto min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 p-2 text-center text-xs font-extrabold leading-tight text-white shadow-md transition-all hover:bg-emerald-700"
                           >
-                            <Check size={16} />
-                            <span>Dispatch / Server Picked Up</span>
+                            <Check size={16} className="shrink-0" />
+                            <span>Dispatch / <br className="sm:hidden" />Server Picked Up</span>
                           </button>
                         </div>
                       </Card>
@@ -2332,56 +2222,58 @@ const ChefOperationsDesk: React.FC = () => {
           setIsOrderModalOpen(false);
           setSelectedKdsTicket(null);
         }}
-        footer={[
-          <Button
-            key="close"
-            className="h-11 rounded-xl px-6 font-bold"
-            onClick={() => {
-              setIsOrderModalOpen(false);
-              setSelectedKdsTicket(null);
-            }}
-          >
-            Close
-          </Button>,
-          selectedKdsTicket?.status === 'PENDING' && (
-            <button
-              key="start-cooking"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button
+              key="close"
+              className="h-11 rounded-xl px-6 font-bold"
               onClick={() => {
-                fetchAndCalculateOrderBOM(selectedKdsTicket);
-              }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-bold text-white shadow-md hover:bg-[#d95a14] active:scale-95"
-            >
-              <Boxes size={16} />
-              <span>Check BOM to Start Cooking</span>
-            </button>
-          ),
-          selectedKdsTicket?.status === 'PREPARING' && (
-            <button
-              key="mark-ready"
-              onClick={() => {
-                handleAdvanceKdsStatus(selectedKdsTicket.id, 'READY');
                 setIsOrderModalOpen(false);
+                setSelectedKdsTicket(null);
               }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#092968] px-6 text-xs font-bold text-white shadow-md hover:bg-[#0c3585] active:scale-95"
             >
-              <CheckCircle2 size={16} className="text-emerald-400" />
-              <span>Mark Plated & Ready</span>
-            </button>
-          ),
-          selectedKdsTicket?.status === 'READY' && (
-            <button
-              key="mark-served"
-              onClick={() => {
-                handleAdvanceKdsStatus(selectedKdsTicket.id, 'SERVED');
-                setIsOrderModalOpen(false);
-              }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95"
-            >
-              <Check size={16} />
-              <span>Dispatch / Picked Up</span>
-            </button>
-          ),
-        ]}
+              Close
+            </Button>
+            {selectedKdsTicket?.status === 'PENDING' && (
+              <button
+                key="start-cooking"
+                onClick={() => {
+                  fetchAndCalculateOrderBOM(selectedKdsTicket);
+                }}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#F26E22] px-6 text-xs font-bold text-white shadow-md hover:bg-[#d95a14] active:scale-95"
+              >
+                <Boxes size={16} />
+                <span>Check BOM to Start Cooking</span>
+              </button>
+            )}
+            {selectedKdsTicket?.status === 'PREPARING' && (
+              <button
+                key="mark-ready"
+                onClick={() => {
+                  handleAdvanceKdsStatus(selectedKdsTicket.id, 'READY');
+                  setIsOrderModalOpen(false);
+                }}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#092968] px-6 text-xs font-bold text-white shadow-md hover:bg-[#0c3585] active:scale-95"
+              >
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                <span>Mark Plated & Ready</span>
+              </button>
+            )}
+            {selectedKdsTicket?.status === 'READY' && (
+              <button
+                key="mark-served"
+                onClick={() => {
+                  handleAdvanceKdsStatus(selectedKdsTicket.id, 'SERVED');
+                  setIsOrderModalOpen(false);
+                }}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95"
+              >
+                <Check size={16} />
+                <span>Dispatch / Picked Up</span>
+              </button>
+            )}
+          </div>
+        }
         width={750}
         centered
       >
@@ -2665,7 +2557,7 @@ const ChefOperationsDesk: React.FC = () => {
         ) : selectedBulkItem?.orderTicketId && orderBOMResults.length > 0 ? (
           <div
             id="bom-calculation-modal-content"
-            className="max-h-[68vh] space-y-4 overflow-y-auto py-1 pr-1"
+            className="custom-scrollbar max-h-[68vh] space-y-4 overflow-y-auto py-1 pr-1"
           >
             {/* Top Summary Bar */}
             {orderBOMSummary && (
@@ -2760,7 +2652,7 @@ const ChefOperationsDesk: React.FC = () => {
                     </div>
 
                     {/* Raw Materials Table for this Dish */}
-                    <div className="overflow-x-auto">
+                    <div className="custom-scrollbar overflow-x-auto">
                       <table className="w-full text-left text-xs">
                         <thead>
                           <tr className="bg-slate-100/60 text-[10px] font-extrabold uppercase text-slate-500">
@@ -2850,7 +2742,7 @@ const ChefOperationsDesk: React.FC = () => {
               </div>
 
               {/* Materials Table */}
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="custom-scrollbar overflow-x-auto rounded-2xl border border-slate-200">
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-slate-100 text-[11px] font-extrabold uppercase text-slate-600">
